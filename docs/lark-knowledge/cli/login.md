@@ -1,6 +1,6 @@
 # lark-mcp login
 
-> **Source**: https://github.com/larksuite/lark-openapi-mcp/blob/main/docs/reference/cli/cli.md
+> **原典**: https://github.com/larksuite/lark-openapi-mcp/blob/main/docs/reference/cli/cli.md
 
 ユーザー ID でログインし、personal data 用の access token を取得するコマンド。
 
@@ -23,12 +23,12 @@ npx -y @larksuiteoapi/lark-mcp login \
 
 | パラメータ | 省略形 | 既定値 | 説明 |
 |---|---|---|---|
-| `--app-id` | `-a` | — | Application ID |
-| `--app-secret` | `-s` | — | Application secret |
-| `--domain` | `-d` | `https://open.feishu.cn` | Feishu/Lark API domain。"Feishu/Lark API domain, default is https://open.feishu.cn" |
-| `--host` | — | `localhost` | OAuth callback を受信する listening host |
-| `--port` | `-p` | `3000` | Listening port |
-| `--scope` | — | *全許可済みスコープ* | OAuth permissions。"default is all permissions granted to the app" |
+| `--app-id` | `-a` | — | アプリケーション ID |
+| `--app-secret` | `-s` | — | アプリケーションシークレット |
+| `--domain` | `-d` | `https://open.feishu.cn` | Feishu/Lark API のドメイン。既定値は `https://open.feishu.cn` |
+| `--host` | — | `localhost` | OAuth callback を受信する待ち受けホスト |
+| `--port` | `-p` | `3000` | 待ち受けポート |
+| `--scope` | — | *全許可済みスコープ* | OAuth 権限。既定ではアプリに付与されたすべての権限 |
 
 ## 典型ユースケース
 

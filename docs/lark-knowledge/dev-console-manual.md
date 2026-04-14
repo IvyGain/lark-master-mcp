@@ -1,6 +1,6 @@
-# Developer Console — 一度だけ必要な手動作業
+# 開発者コンソール — 一度だけ必要な手動作業
 
-> **Scope**: Lark Open Platform 開発者コンソールでの手動作業を **一回** だけ行い、
+> **対象範囲**: Lark Open Platform 開発者コンソールでの手動作業を **一回** だけ行い、
 > App ID / App Secret / Redirect URI / スコープ / Bot 有効化を済ませる手順。
 >
 > これさえ終われば以降は `npx lark-master setup` で全自動化されます。

@@ -1,9 +1,9 @@
-# @larksuiteoapi/node-sdk — user_access_token OAuth
+# @larksuiteoapi/node-sdk — user_access_token の OAuth 取得
 
 ユーザー個人の権限で Lark API を呼ぶために必要な `user_access_token` を取得する
 3 ステップのフロー。`lark-mcp login` が内部で行っている処理でもあります。
 
-> **💡 NOTE**: `lark-master-mcp` では **このフローを自作しません**。
+> **💡 注意**: `lark-master-mcp` では **このフローを自作しません**。
 > `@larksuiteoapi/lark-mcp login` を spawn するだけでよいため、本ドキュメントは
 > トラブルシュート時の参考資料です。
 
@@ -11,16 +11,17 @@
 
 ```
 ┌─────┐    ①authorize URL    ┌──────┐
-│ User│──────────────────────▶│ Lark │
+│ユーザ│──────────────────────▶│ Lark │
 │     │◀──────────────────────│      │
-└─────┘   redirect with code  └──────┘
+└─────┘   code 付きリダイレクト  └──────┘
    │
    │ ②code
    ▼
 ┌─────────────┐   POST /authen/v1/access_token   ┌──────┐
-│  Your App   │─────────────────────────────────▶│ Lark │
-│ (callback)  │◀─────────────────────────────────│      │
-└─────────────┘   user_access_token + refresh    └──────┘
+│  あなたの   │─────────────────────────────────▶│ Lark │
+│ アプリ      │◀─────────────────────────────────│      │
+│ (callback)  │   user_access_token + refresh    └──────┘
+└─────────────┘
    │
    │ ③API 呼び出し時に Bearer で付与
    ▼
@@ -30,7 +31,7 @@
 └──────┘
 ```
 
-## Step 1 — Authorize URL を組み立ててブラウザへリダイレクト
+## ステップ 1 — authorize URL を組み立ててブラウザへリダイレクト
 
 ```
 https://open.larksuite.com/open-apis/authen/v1/index
@@ -42,15 +43,15 @@ https://open.larksuite.com/open-apis/authen/v1/index
 
 | パラメータ | 必須 | 説明 |
 |---|---|---|
-| `app_id` | ✅ | Self-built App の App ID |
-| `redirect_uri` | ✅ | 開発者コンソールに登録済みの Redirect URI |
+| `app_id` | ✅ | セルフビルドアプリの App ID |
+| `redirect_uri` | ✅ | 開発者コンソールに登録済みのリダイレクト URI |
 | `scope` | ⚪ | 要求スコープ (スペース区切り) |
-| `state` | 推奨 | CSRF 対策の乱数 |
+| `state` | 推奨 | CSRF 対策用の乱数 |
 
 ブラウザでこの URL を開くと Lark の同意画面が表示され、ユーザーが承認すると
 `redirect_uri` に `?code=xxx&state=xxx` 付きでリダイレクトされます。
 
-## Step 2 — code を user_access_token に交換
+## ステップ 2 — code を user_access_token に交換
 
 ```ts
 import * as lark from '@larksuiteoapi/node-sdk';
@@ -61,7 +62,7 @@ const client = new lark.Client({
   domain: lark.Domain.Lark,
 });
 
-// Lark の公式 API: POST /open-apis/authen/v1/access_token
+// Lark 公式 API: POST /open-apis/authen/v1/access_token
 const res = await client.authen.v1.accessToken.create({
   data: {
     grant_type: 'authorization_code',
@@ -69,7 +70,7 @@ const res = await client.authen.v1.accessToken.create({
   },
 });
 
-// res.data に以下が含まれる
+// res.data には以下が含まれる
 // {
 //   access_token: 'u-xxxxxxxxxxxxxxxxxxxxxxxx',
 //   token_type: 'Bearer',
@@ -80,7 +81,7 @@ const res = await client.authen.v1.accessToken.create({
 // }
 ```
 
-## Step 3 — API 呼び出し時に付与
+## ステップ 3 — API 呼び出し時にトークンを付与
 
 ```ts
 await client.calendar.v4.calendarEvent.create(
@@ -92,9 +93,9 @@ await client.calendar.v4.calendarEvent.create(
 );
 ```
 
-## Refresh Token フロー
+## リフレッシュトークンフロー
 
-`access_token` は 7200 秒 (2 時間) で失効。`refresh_token` を使って再取得:
+`access_token` は 7200 秒 (2 時間) で失効します。`refresh_token` を使って再取得します:
 
 ```ts
 const res = await client.authen.v1.accessToken.create({
@@ -105,14 +106,14 @@ const res = await client.authen.v1.accessToken.create({
 });
 ```
 
-`refresh_token` 自体は 30 日程度で失効 (`refresh_expires_in` 参照)。
-失効した場合は Step 1 からやり直し = ユーザー再同意が必要。
+`refresh_token` 自体は 30 日程度で失効します (`refresh_expires_in` 参照)。
+失効した場合はステップ 1 からやり直し = ユーザーの再同意が必要です。
 
 ## `lark-mcp --oauth` がやってくれること
 
-- `mcp` サーバが token の期限を監視
+- `mcp` サーバがトークンの期限を監視
 - API 呼び出し時に失効 / 期限間近を検知すると自動でブラウザを開いて再認証を要求
-- `refresh_token` が生きていれば silent refresh、切れていれば新規同意フロー
+- `refresh_token` が生きていればサイレントリフレッシュ、切れていれば新規同意フロー
 
 これを自作しなくて済むのが `--oauth` Beta フラグの価値です。
 
@@ -126,7 +127,7 @@ const res = await client.authen.v1.accessToken.create({
 
 | エラー | 原因 | 対処 |
 |---|---|---|
-| `redirect_uri_mismatch` | App 設定の Redirect URI と不一致 | コンソール側に一致する URI を登録 |
-| `invalid_code` | code 期限切れ (~5 分) | 最初からやり直し |
-| `scope_not_granted` | App に未付与のスコープを要求 | コンソールでスコープ申請 or `--scope` 指定を減らす |
-| `refresh_token_expired` | 30 日以上未使用 | Step 1 から再同意 |
+| `redirect_uri_mismatch` | アプリ設定のリダイレクト URI と不一致 | コンソール側に一致する URI を登録 |
+| `invalid_code` | code が期限切れ (約 5 分) | 最初からやり直し |
+| `scope_not_granted` | アプリに未付与のスコープを要求 | コンソールでスコープ申請、または `--scope` 指定を減らす |
+| `refresh_token_expired` | 30 日以上未使用 | ステップ 1 から再同意 |

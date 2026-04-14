@@ -1,164 +1,181 @@
-# Runbook: Incident Response
+# Runbook: インシデント対応
 
-Cheat sheet for the most common failures in the cloud path. For secret
-rotation see `docs/runbook/rotate-secrets.md`. For first-time deploy see
-`docs/runbook/deploy.md`.
+クラウド経路で頻出する障害への対応チートシートです。シークレットのローテーションに
+ついては `docs/runbook/rotate-secrets.md`、初回デプロイ手順については
+`docs/runbook/deploy.md` を参照してください。
 
-## 0. Situational awareness (run these first)
+## 0. 状況把握 (まずはこれを実行)
 
 ```bash
-# Worker + DO logs, pretty
+# Worker + DO のログ (pretty フォーマット)
 wrangler tail --format=pretty
 
-# Brain container logs
+# Brain コンテナのログ
 fly logs -a lark-brain
 
-# lark-cli auth
+# lark-cli の認証状態
 lark-cli auth status
 
-# D1 quick sanity
+# D1 の簡易ヘルスチェック
 wrangler d1 execute lark-master --remote \
   --command "SELECT COUNT(*) AS n FROM messages WHERE created_at > datetime('now','-10 minutes')"
 ```
 
 ---
 
-## Incident A: "The bot doesn't reply"
+## インシデント A: 「Bot が返信しない」
 
-Work the layers top-down. Stop at the first layer that is red.
+上から順にレイヤーを辿って切り分けます。最初に「赤」になったレイヤーで止めて
+ください。
 
 ### A.1 Lark → Worker
 
-- `wrangler tail` while you send a test message.
-- Expected: `POST /lark/event 200` within ~1s.
-- Red flags: no log line at all (Lark isn't reaching the Worker), or 401 (signature).
+- テストメッセージを送りながら `wrangler tail` を観察します。
+- 期待値: 約 1 秒以内に `POST /lark/event 200`。
+- 警戒すべき兆候: ログが全く出ない (Lark が Worker に到達していない)、もしくは
+  401 (署名エラー)。
 
-If no line: check the Lark Developer Console → Event Subscription URL. Click "Verify". If that fails, the Worker URL or the Verification Token is wrong.
+ログが出ない場合: Lark 開発者コンソール → Event Subscription URL を確認し、
+「Verify」をクリックします。これが失敗するなら Worker の URL か Verification
+Token が間違っています。
 
-If 401: rotate the verification token following `docs/runbook/rotate-secrets.md` §2. Look in `audit` for `signature_failed` rows.
+401 が出る場合: `docs/runbook/rotate-secrets.md` の §2 に従って verification
+token をローテーションしてください。`audit` テーブルで `signature_failed` の行も
+確認します。
 
 ### A.2 Worker → DO
 
-- `wrangler tail` should show a `ConversationDO` log line acknowledging the session_id.
-- If absent, the routing code in `/lark/event` didn't pick up the event type. Check the event payload shape.
+- `wrangler tail` に、session_id を受理した `ConversationDO` のログが出るはずです。
+- もし出ていなければ、`/lark/event` 内のルーティングコードがそのイベント種別を
+  拾えていません。イベントペイロードの形を確認してください。
 
 ### A.3 DO → Brain
 
-- `wrangler tail` should show `POST $BRAIN_URL/invoke`.
-- Red flags: timeout, 401, 5xx.
+- `wrangler tail` に `POST $BRAIN_URL/invoke` が記録されているはずです。
+- 警戒すべき兆候: タイムアウト、401、5xx。
 
 ```bash
-# From your laptop
+# ローカルの作業端末から
 curl -i -H "Authorization: Bearer $BRAIN_SHARED_SECRET" $BRAIN_URL/healthz
 ```
 
-- 401: `BRAIN_SHARED_SECRET` drift between Worker and brain. Re-apply (`docs/runbook/rotate-secrets.md` §4).
-- Connection refused: the container is down. `fly status -a lark-brain` then `fly deploy` or `fly machine restart`.
+- 401: Worker と brain の間で `BRAIN_SHARED_SECRET` がずれています。
+  `docs/runbook/rotate-secrets.md` §4 に従って再適用してください。
+- Connection refused: コンテナが落ちています。`fly status -a lark-brain` を確認し、
+  必要に応じて `fly deploy` または `fly machine restart` を実行します。
 
 ### A.4 Brain → lark-cli
 
-- `fly logs -a lark-brain` — look for stderr from the Claude Agent SDK.
-- Common error: `lark-cli: command not found`. This means the image build lost the global install. Rebuild and redeploy the brain.
+- `fly logs -a lark-brain` を見て、Claude Agent SDK から stderr に出ているログを
+  確認します。
+- よくあるエラー: `lark-cli: command not found`。これはイメージビルド時のグローバル
+  インストールが失われていることを意味します。brain を再ビルドして再デプロイして
+  ください。
 
 ### A.5 lark-cli → Lark Open API
 
-- If `lark-cli auth status` shows expired or missing credentials, re-run:
+- `lark-cli auth status` で認証情報が失効または欠落している場合、以下を再実行します:
 
   ```bash
   lark-cli config init
   lark-cli auth status
   ```
 
-- If the app secret was rotated recently, you must `lark-cli config init` again.
+- 直近で App Secret をローテーションした場合は、`lark-cli config init` を再度
+  実行する必要があります。
 
 ---
 
-## Incident B: "Token expired / 401 from Lark Open API"
+## インシデント B: 「トークン期限切れ / Lark Open API から 401」
 
-Typically caused by `LARK_APP_SECRET` rotation or a stale cached app access token in KV.
+典型的な原因は `LARK_APP_SECRET` のローテーション、または KV にキャッシュされた
+古い app access token です。
 
 ```bash
-# Force-clear the cached app access token
+# キャッシュされた app access token を強制クリア
 wrangler kv key delete --binding=CACHE "lark:app_access_token"
 
-# Re-init lark-cli
+# lark-cli を再初期化
 lark-cli config init
 lark-cli auth status
 ```
 
-If the rotation was recent, double-check that the Worker secret was
-re-`put` and that the Worker was redeployed (secret changes are not picked
-up until the next deploy).
+直近でローテーションを行った場合は、Worker シークレットに対して `put` をやり直して
+あり、かつ Worker が再デプロイされていることを必ず確認してください (シークレットの
+変更は次回のデプロイまで反映されません)。
 
-### Verification
+### 検証チェックリスト
 
-- [ ] `lark-cli im list-messages ...` against a real chat succeeds.
-- [ ] New test message to the bot produces a reply.
+- [ ] 実際のチャットに対する `lark-cli im list-messages ...` が成功する。
+- [ ] 新しいテストメッセージに対して Bot が返信を返す。
 
 ---
 
-## Incident C: "Rate limit hit / conversation is stuck"
+## インシデント C: 「レートリミットに到達 / 会話が詰まっている」
 
-Symptoms: the bot replies to some threads but the stuck thread keeps
-timing out or never returns.
+症状: 一部のスレッドでは Bot が返信するが、詰まっているスレッドはタイムアウト
+し続ける、または一向に応答が返らない。
 
-The DO is a single-writer for one `session_id`. If a turn is wedged (brain
-crashed mid-turn, DO `in_flight=true` never cleared), new events for that
-thread queue behind it.
+DO は 1 つの `session_id` につき single-writer です。あるターンが途中で詰まると
+(brain がターンの途中でクラッシュ、DO の `in_flight=true` がクリアされない等)、
+そのスレッド宛の新しいイベントはその後ろにキューイングされます。
 
 ```bash
-# Inspect the DO's storage
+# DO のストレージを観察する
 wrangler tail --format=pretty
-# Look for "in_flight=true" log lines on the affected session_id.
+# 該当 session_id に対する "in_flight=true" のログ行を探す。
 ```
 
-Mitigations:
+緩和策:
 
-1. **Force-reset the stuck DO**: redeploy the Worker — DOs recycle on
-   deploy, clearing in-memory state. In-flight storage keys that don't
-   self-clean should be fixed in code, not operationally.
-2. **Adjust per-thread policy**: if you need tighter serialization or a
-   timeout-and-kill, update `ConversationDO` to expire `in_flight` after N
-   seconds and issue an apologetic `send_reply_text`.
-3. **Per-tenant throttle**: if abuse, add a KV-backed token bucket keyed by
-   `tenant_key`. See the "TODO: per-tenant rate limiting" item in
-   `docs/architecture/security.md`.
+1. **詰まった DO を強制リセット**: Worker を再デプロイすると DO が再生成され、
+   インメモリ状態がクリアされます。自動クリーンアップされない in-flight の
+   ストレージキーは運用でごまかすのではなく、コード側で修正すべきです。
+2. **スレッド単位のポリシー調整**: より厳密な直列化やタイムアウト → キルが必要な
+   場合は、`ConversationDO` を更新して N 秒後に `in_flight` を期限切れにし、
+   謝罪メッセージ付きの `send_reply_text` を発行するようにしてください。
+3. **テナント単位のスロットル**: 乱用がある場合は、`tenant_key` をキーとした
+   KV ベースのトークンバケットを追加します。`docs/architecture/security.md` の
+   「TODO: per-tenant rate limiting」項目を参照してください。
 
-### Verification
+### 検証チェックリスト
 
-- [ ] The stuck thread accepts a new message after mitigation.
-- [ ] `audit` shows no `do_stuck` rows for the last 10 minutes.
-
----
-
-## Incident D: "OAuth callback returns 500"
-
-Symptoms: the `/connected` page in `apps/web` never renders, or the Worker
-returns 500 on `/lark/oauth/callback`.
-
-Most common cause: redirect URI mismatch between Lark Dev Console, Worker
-secret, and `apps/web` env (`NEXT_PUBLIC_LARK_REDIRECT_URI`).
-
-1. Check the three values match *character for character*:
-   - Lark Dev Console → Redirect URLs
-   - `vercel env ls` on the `apps/web` project → `NEXT_PUBLIC_LARK_REDIRECT_URI`
-   - Worker code path `/lark/oauth/callback` URL (scheme, host, path)
-2. Check `wrangler tail` on the failing callback. Look for:
-   - `bad_redirect_uri` — mismatch above.
-   - `state_mismatch` — the `state` nonce isn't in KV (likely user took too long; retry).
-   - `exchange_failed` — Lark returned a non-200. Verify `LARK_APP_ID` and `LARK_APP_SECRET` are current.
-3. Check `audit` for the most recent `oauth_callback_failed` row, which
-   will carry the reason.
-
-### Verification
-
-- [ ] Clicking "Add to Lark" on the Vercel landing completes and lands on `/connected`.
-- [ ] A new row exists in `users` and `tokens` for the test user.
-- [ ] `wrangler tail` shows `/lark/oauth/callback 302` for the success case.
+- [ ] 緩和策の適用後、詰まっていたスレッドが新しいメッセージを受理する。
+- [ ] 直近 10 分間で `audit` に `do_stuck` の行が追加されていない。
 
 ---
 
-## Related documents
+## インシデント D: 「OAuth コールバックが 500 を返す」
+
+症状: `apps/web` の `/connected` ページが表示されない、または Worker が
+`/lark/oauth/callback` で 500 を返す。
+
+最も多い原因は Lark 開発者コンソール、Worker のシークレット、`apps/web` の環境
+変数 (`NEXT_PUBLIC_LARK_REDIRECT_URI`) の間で redirect URI が一致していないこと
+です。
+
+1. 以下 3 か所の値が *一字一句* 一致しているか確認します:
+   - Lark 開発者コンソール → Redirect URLs
+   - `apps/web` プロジェクトで `vercel env ls` → `NEXT_PUBLIC_LARK_REDIRECT_URI`
+   - Worker コード上の `/lark/oauth/callback` URL (スキーム、ホスト、パス)
+2. 失敗している callback に対する `wrangler tail` を確認します。以下を探します:
+   - `bad_redirect_uri` — 上記のミスマッチ。
+   - `state_mismatch` — `state` nonce が KV に存在しない (ユーザーが時間を掛け
+     すぎた可能性。再試行してください)。
+   - `exchange_failed` — Lark が 200 以外を返しています。`LARK_APP_ID` と
+     `LARK_APP_SECRET` が最新であることを確認してください。
+3. `audit` テーブルで直近の `oauth_callback_failed` 行を確認します。原因が
+   記録されています。
+
+### 検証チェックリスト
+
+- [ ] Vercel のランディングページで「Add to Lark」をクリックすると処理が完了し `/connected` に着地する。
+- [ ] テストユーザーに対応する行が `users` と `tokens` に新規追加されている。
+- [ ] 成功ケースにおいて `wrangler tail` に `/lark/oauth/callback 302` が表示される。
+
+---
+
+## 関連ドキュメント
 
 - `docs/architecture/overview.md`
 - `docs/architecture/sequence-phone-to-cloud.md`

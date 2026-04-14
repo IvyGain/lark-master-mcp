@@ -1,10 +1,10 @@
-# Security: Threat Model Snapshot
+# セキュリティ: 脅威モデルのスナップショット
 
-Scope: `apps/webhook` (Cloudflare Worker) and `apps/brain` (Node container).
-The local `apps/mcp-server` path inherits the user's desktop trust boundary
-and is out of scope for cloud threats.
+スコープ: `apps/webhook` (Cloudflare Worker) および `apps/brain` (Node コンテナ)。
+ローカルの `apps/mcp-server` 経路はユーザーのデスクトップの信頼境界を継承しており、
+クラウド脅威のスコープ外です。
 
-## Trust boundaries
+## 信頼境界
 
 ```
  Internet
@@ -26,106 +26,111 @@ and is out of scope for cloud threats.
  [Lark Open API]
 ```
 
-## Controls currently in place
+## 現在実装されている対策
 
-### 1. Lark signature verification
+### 1. Lark 署名検証
 
-- Every `/lark/event` and `/lark/card-action` request recomputes HMAC over
-  `timestamp + nonce + raw body` with `LARK_VERIFICATION_TOKEN`.
-- Requests failing verification are 401'd and logged to `audit`.
-- When `LARK_ENCRYPT_KEY` is set, the inner payload is AES-decrypted before
-  parsing; decryption errors also 401.
+- すべての `/lark/event` および `/lark/card-action` リクエストに対して、
+  `LARK_VERIFICATION_TOKEN` を用いて `timestamp + nonce + raw body` に対する
+  HMAC を再計算します。
+- 検証に失敗したリクエストは 401 を返し、`audit` に記録されます。
+- `LARK_ENCRYPT_KEY` が設定されている場合、パース前に内側のペイロードを AES で
+  復号します。復号エラーも 401 になります。
 
-### 2. Worker → Brain shared secret
+### 2. Worker → Brain の共有シークレット
 
-- `POST /invoke` on the brain requires
-  `Authorization: Bearer ${BRAIN_SHARED_SECRET}`.
-- The same secret is set in the Worker (as a `wrangler secret`) and in the
-  container environment. Mismatched secrets are 401'd.
-- Because the brain is network-reachable, this is the *only* thing
-  preventing a public actor from invoking the Claude Agent SDK loop and
-  billing our Anthropic account. Treat it like a root credential.
+- ブレインの `POST /invoke` は
+  `Authorization: Bearer ${BRAIN_SHARED_SECRET}` を要求します。
+- 同じシークレットが Worker 側 (`wrangler secret` として) とコンテナ環境の
+  両方に設定されています。シークレットが一致しないものは 401 を返します。
+- ブレインはネットワークから到達可能であるため、これは公衆のアクターが
+  Claude Agent SDK ループを起動し、我々の Anthropic アカウントに課金させる
+  ことを防ぐ*唯一*の手段です。ルート資格情報と同様に扱ってください。
 
-### 3. DO single-writer as implicit rate limiter
+### 3. 暗黙的レートリミッタとしての DO 単一ライター
 
-- All turns for a given `session_id` serialize through one DO instance, so a
-  single abusive thread can only consume one Claude Agent SDK loop at a time.
-- Combined with a Lark per-bot message rate limit, this is currently the
-  only rate-limit layer. A global ceiling per tenant should be added later.
+- 特定の `session_id` に対するすべてのターンは 1 つの DO インスタンスを通じて
+  直列化されます。したがって、1 つの悪用スレッドが同時に消費できるのは Claude
+  Agent SDK ループ 1 つのみです。
+- Lark のボット単位のメッセージレートリミットと組み合わせて、これが現状
+  唯一のレートリミット層です。テナントごとのグローバル上限は後で追加すべきです。
 
-### 4. Destructive-action confirmation
+### 4. 破壊的アクションの確認
 
-- The Lark-specific system prompt in `runBrain()` instructs the agent to
-  emit a confirmation card (via `send_reply_card`) before running any
-  destructive `lark-cli` subcommand (e.g. deleting a base record, canceling
-  a meeting). The user has to click "Confirm" which comes back through
-  `/lark/card-action`.
-- This is a soft control in the prompt today; a hardened version would also
-  deny-list destructive subcommands in the brain's `Bash` tool policy.
+- `runBrain()` 内の Lark 専用システムプロンプトは、破壊的な `lark-cli`
+  サブコマンド（例: ベースレコードの削除、会議のキャンセル）を実行する前に、
+  エージェントに対して（`send_reply_card` による）確認カードの発行を指示します。
+  ユーザーは「Confirm」をクリックする必要があり、それは `/lark/card-action` を
+  経由して返ってきます。
+- 今日時点ではこれはプロンプトによるソフトな制御です。より堅牢化されたバージョン
+  では、ブレインの `Bash` ツールポリシー内で破壊的サブコマンドを拒否リストに
+  入れるべきです。
 
-### 5. Secrets only in Worker/Container secret stores
+### 5. シークレットは Worker/Container のシークレットストアにのみ
 
-- All 7 Worker secrets are stored via `wrangler secret put`, never in
-  `wrangler.jsonc`.
-- Brain secrets are injected as container env vars at deploy time
-  (`fly secrets set`, or the equivalent on Cloudflare Containers when GA).
-- No secrets in the git repo. `.env.example` files, if any, must stay empty.
+- Worker のシークレット 7 個はすべて `wrangler secret put` 経由で保存され、
+  `wrangler.jsonc` に入ることはありません。
+- ブレインのシークレットはデプロイ時にコンテナ環境変数として注入されます
+  (`fly secrets set`、または Cloudflare Containers の GA 時にその相当機能)。
+- git リポジトリ内にシークレットはありません。もし `.env.example` ファイルが
+  ある場合、それは空のままでなければなりません。
 
-## Known gaps / TODO
+## 既知のギャップ / TODO
 
-### A. Token encryption at rest
+### A. トークンの保存時暗号化
 
-- `tokens.access_token` and `tokens.refresh_token` are currently stored in
-  D1 as plaintext UTF-8. If D1 leaks, every connected user's Lark session is
-  compromised.
-- Plan: add a Worker secret `TOKEN_ENCRYPTION_KEY` (32 random bytes,
-  base64). Wrap `tokens` writes with AES-GCM-256 using a random 12-byte IV
-  stored alongside the ciphertext. Decrypt on read. Migration can be done
-  lazily: re-encrypt on next refresh.
+- `tokens.access_token` と `tokens.refresh_token` は現状、D1 にプレーンな
+  UTF-8 として保存されています。D1 が漏洩すると、接続中のすべてのユーザーの
+  Lark セッションが侵害されます。
+- 計画: Worker シークレット `TOKEN_ENCRYPTION_KEY` (32 ランダムバイトを base64)
+  を追加します。`tokens` への書き込みを AES-GCM-256 でラップし、暗号文と共に
+  保存する 12 バイトのランダム IV を使用します。読み取り時に復号します。
+  マイグレーションは遅延実行でも可能です（次回のリフレッシュ時に再暗号化）。
 
-### B. Destructive-action hardening
+### B. 破壊的アクションの堅牢化
 
-- The agent prompt asks for confirmation; no structural block prevents it
-  from issuing `lark-cli base record delete` directly. Add a subcommand
-  allow-list inside the brain's `Bash` tool invocation.
+- エージェントプロンプトが確認を要求しますが、エージェントが直接
+  `lark-cli base record delete` を発行するのを構造的にブロックするものは
+  ありません。ブレインの `Bash` ツール呼び出し内にサブコマンドの許可リストを
+  追加してください。
 
-### C. Per-tenant rate limiting
+### C. テナント単位のレートリミット
 
-- The DO serializes one thread. Two abusive threads in the same tenant
-  currently cost O(threads) concurrent brain calls.
-- Plan: a KV-backed token bucket keyed by `tenant_key`, checked in the DO
-  before calling the brain.
+- DO は 1 スレッドを直列化します。同じテナント内の 2 つの悪用スレッドは現状、
+  O(threads) の同時ブレイン呼び出しのコストがかかります。
+- 計画: `tenant_key` をキーとした KV ベースのトークンバケットを、DO 内で
+  ブレイン呼び出しの前にチェックします。
 
-### D. Audit drain
+### D. 監査ログのドレイン
 
-- `audit` rows stay in D1 forever. Add a scheduled Worker (cron trigger) to
-  export them to R2 or Logpush weekly.
+- `audit` 行は D1 に永遠に残ります。スケジュール付き Worker（cron トリガー）を
+  追加し、週次で R2 または Logpush にエクスポートしてください。
 
-## Secret rotation
+## シークレットのローテーション
 
-Covered in detail in `docs/runbook/rotate-secrets.md`. Summary:
+詳細は `docs/runbook/rotate-secrets.md` を参照してください。サマリー:
 
-| Secret | Owner | Downtime? |
-|--------|-------|-----------|
-| `LARK_VERIFICATION_TOKEN` | Lark Dev Console + Worker | Flip both within ~30s. |
-| `LARK_ENCRYPT_KEY` | Lark Dev Console + Worker | Flip both within ~30s. |
-| `LARK_APP_SECRET` | Lark Dev Console + Worker | Flip both; lark-cli may need re-auth. |
-| `BRAIN_SHARED_SECRET` | Worker + Brain env | Dual-accept window via two Worker env vars. |
-| `ANTHROPIC_API_KEY` | Brain env | Hot swap. |
+| Secret | Owner | ダウンタイム? |
+|--------|-------|---------------|
+| `LARK_VERIFICATION_TOKEN` | Lark Dev Console + Worker | 両方を 30 秒以内に切り替え。 |
+| `LARK_ENCRYPT_KEY` | Lark Dev Console + Worker | 両方を 30 秒以内に切り替え。 |
+| `LARK_APP_SECRET` | Lark Dev Console + Worker | 両方を切り替え。lark-cli の再認証が必要な場合あり。 |
+| `BRAIN_SHARED_SECRET` | Worker + Brain env | 2 つの Worker 環境変数経由でデュアルアクセプト期間を設けます。 |
+| `ANTHROPIC_API_KEY` | Brain env | ホットスワップ可能。 |
 
-## Threats and mitigations
+## 脅威と緩和策
 
-| Threat | Mitigation |
-|--------|------------|
-| Attacker posts forged `/lark/event` | Signature verification with `LARK_VERIFICATION_TOKEN`. |
-| Attacker hits `/invoke` on brain directly | `BRAIN_SHARED_SECRET` bearer check. |
-| Attacker replays a Lark event | DO dedupe by `event_id` + `session_id`. |
-| Malicious LLM tool-call sequence | System prompt restricts `Bash` to lark-cli; card-confirmation for destructive ops. |
-| D1 leak | (Pending) AES-GCM on `tokens` columns. |
-| OAuth callback CSRF | State parameter validated in `/lark/oauth/callback`, tied to KV-stored nonce. |
-| Secret sprawl | All secrets via `wrangler secret put` / container env; none in `wrangler.jsonc` or git. |
+| 脅威 | 緩和策 |
+|------|--------|
+| 攻撃者が偽造した `/lark/event` を POST | `LARK_VERIFICATION_TOKEN` による署名検証。 |
+| 攻撃者がブレインの `/invoke` を直接叩く | `BRAIN_SHARED_SECRET` の Bearer チェック。 |
+| 攻撃者が Lark イベントをリプレイ | DO による `event_id` + `session_id` の重複排除。 |
+| 悪意ある LLM のツール呼び出しシーケンス | システムプロンプトが `Bash` を lark-cli に制限。破壊的操作にはカード確認。 |
+| D1 の漏洩 | (保留中) `tokens` カラムに AES-GCM を適用。 |
+| OAuth コールバック CSRF | `/lark/oauth/callback` 内で state パラメータを検証し、KV に保存した nonce と紐付けます。 |
+| シークレットの拡散 | すべてのシークレットは `wrangler secret put` / コンテナ環境変数経由。`wrangler.jsonc` や git には置きません。 |
 
-## Related documents
+## 関連ドキュメント
 
 - `docs/architecture/overview.md`
 - `docs/architecture/data-model.md`

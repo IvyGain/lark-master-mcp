@@ -1,6 +1,6 @@
 # lark-mcp logout
 
-> **Source**: https://github.com/larksuite/lark-openapi-mcp/blob/main/docs/reference/cli/cli.md
+> **原典**: https://github.com/larksuite/lark-openapi-mcp/blob/main/docs/reference/cli/cli.md
 
 ローカルに保存された user access token を削除するコマンド。
 
@@ -18,7 +18,7 @@ npx -y @larksuiteoapi/lark-mcp logout
 
 | パラメータ | 省略形 | 既定値 | 説明 |
 |---|---|---|---|
-| `--app-id` | `-a` | — (省略可) | "If specified, only clears the token for this app; if not specified, clears tokens for all apps" |
+| `--app-id` | `-a` | — (省略可) | 指定された場合は該当アプリのトークンのみ削除。省略時は全アプリのトークンを削除 |
 
 ## ユースケース
 

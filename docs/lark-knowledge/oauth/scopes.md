@@ -1,4 +1,4 @@
-# OAuth Scopes — 最小権限セット
+# OAuth スコープ — 最小権限セット
 
 `lark-master-mcp` の既定ユースケース (Messenger / Calendar / Docs / Base) に必要な
 スコープ一覧。
@@ -10,7 +10,7 @@
 
 ## カテゴリ別一覧
 
-### Messenger (im)
+### メッセンジャー (im)
 
 | スコープ | 用途 |
 |---|---|
@@ -22,7 +22,7 @@
 | `im:chat:readonly` | チャット情報読み取り専用 |
 | `im:resource` | メッセージ内リソース (画像・ファイル) |
 
-### Calendar
+### カレンダー (calendar)
 
 | スコープ | 用途 |
 |---|---|
@@ -32,13 +32,13 @@
 | `calendar:calendar_event` | イベント全般 |
 | `calendar:calendar_event:readonly` | イベント読み取り専用 |
 
-### Docs (新 Docx)
+### ドキュメント (新 Docx)
 
 | スコープ | 用途 |
 |---|---|
 | `docx:document` | ドキュメント全般 |
 | `docx:document:readonly` | ドキュメント読み取り専用 |
-| `docs:doc` | 旧 Docs 互換 (必要なら) |
+| `docs:doc` | 旧 Docs 互換 (必要な場合) |
 
 ### Base (Bitable)
 
@@ -49,7 +49,7 @@
 | `bitable:record` | レコード全般 |
 | `bitable:record:readonly` | レコード読み取り専用 |
 
-### Drive (添付ファイル操作)
+### ドライブ (添付ファイル操作)
 
 | スコープ | 用途 |
 |---|---|
@@ -57,11 +57,11 @@
 | `drive:file` | ファイル個別操作 |
 | `drive:file:readonly` | 読み取り専用 |
 
-### Contact (人名解決)
+### 連絡先 (人名解決)
 
 | スコープ | 用途 |
 |---|---|
-| `contact:user.id:readonly` | open_id ↔ 他ID 変換 |
+| `contact:user.id:readonly` | open_id ↔ 他の ID 変換 |
 | `contact:user.base:readonly` | ユーザー基本情報 |
 | `contact:department.base:readonly` | 部署情報 |
 
@@ -91,7 +91,7 @@ contact:user.id:readonly
 contact:user.base:readonly
 ```
 
-## Reader モード (読み取り専用プロファイル)
+## リーダーモード (読み取り専用プロファイル)
 
 チーム共有 Bot 等で「壊さない」ことを保証したい場合:
 
@@ -107,6 +107,8 @@ contact:user.base:readonly
 ```
 
 ## スコープを login / mcp に渡す方法
+
+
 
 ### `lark-mcp login --scope`
 
@@ -133,14 +135,14 @@ npx -y @larksuiteoapi/lark-mcp mcp \
 
 ## 開発者コンソール側の事前準備
 
-スコープは **App 側で申請・組織管理者が承認** されている必要があります。
+スコープは **アプリ側で申請・組織管理者が承認** されている必要があります。
 手順は [dev-console-manual.md](../dev-console-manual.md) の「スコープ申請」セクション参照。
 
 ## 検証方法
 
 ```bash
 # 現在のトークンがどのスコープを持っているか確認
-npx -y @larksuiteoapi/node-sdk  # 的な軽量スクリプトで GET /authen/v1/user_info を叩く
+npx -y @larksuiteoapi/node-sdk  # のような軽量スクリプトで GET /authen/v1/user_info を呼び出す
 ```
 
 `lark-master doctor` はこれを内部で実行し、要求スコープと実付与スコープの差分をレポートします。

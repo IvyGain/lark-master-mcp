@@ -1,166 +1,167 @@
-# Runbook: Rotate Secrets
+# Runbook: シークレットのローテーション
 
-How to rotate the five secrets that can meaningfully be rotated without a
-full reinstall. Each procedure is designed to avoid downtime.
+フルインストールをやり直さずに意味のあるローテーションが可能な 5 つのシークレットに
+ついて、その手順を説明します。いずれの手順もダウンタイムを発生させないように設計
+されています。
 
-See `docs/architecture/security.md` for the trust boundaries.
+信頼境界については `docs/architecture/security.md` を参照してください。
 
-## Inventory
+## 対象一覧
 
-| Secret | Owned by | Stored in |
-|--------|----------|-----------|
-| `LARK_APP_SECRET` | Lark Dev Console | Worker (`wrangler secret`) |
-| `LARK_VERIFICATION_TOKEN` | Lark Dev Console | Worker (`wrangler secret`) |
-| `LARK_ENCRYPT_KEY` | Lark Dev Console | Worker (`wrangler secret`) |
-| `BRAIN_SHARED_SECRET` | You | Worker + Brain container env |
-| `ANTHROPIC_API_KEY` | Anthropic Console | Brain container env (+ Worker for pass-through) |
+| シークレット | 管理元 | 保存場所 |
+|------------|-------|---------|
+| `LARK_APP_SECRET` | Lark 開発者コンソール | Worker (`wrangler secret`) |
+| `LARK_VERIFICATION_TOKEN` | Lark 開発者コンソール | Worker (`wrangler secret`) |
+| `LARK_ENCRYPT_KEY` | Lark 開発者コンソール | Worker (`wrangler secret`) |
+| `BRAIN_SHARED_SECRET` | 自前 | Worker + Brain コンテナの環境変数 |
+| `ANTHROPIC_API_KEY` | Anthropic コンソール | Brain コンテナの環境変数 (+ Worker 経由の転送用) |
 
-General rule: never delete the old secret before the new one is live on both
-sides. For the Lark secrets you *must* flip Lark Dev Console and Worker
-within the same short window because there is no dual-accept mode.
+原則: 新しいシークレットが両側で有効になる前に、古いシークレットを削除しては
+いけません。Lark 系のシークレットについては dual-accept モードが存在しないため、
+Lark 開発者コンソールと Worker を短い同一ウィンドウ内で *必ず* 切り替えてください。
 
 ---
 
-## 1. Rotate `LARK_APP_SECRET`
+## 1. `LARK_APP_SECRET` のローテーション
 
-Impact: lark-cli and server-to-server API calls will need to re-auth.
+影響: lark-cli およびサーバー間 API 呼び出しで再認証が必要になります。
 
-1. In the Lark Dev Console, generate a new App Secret. Copy it.
-2. On the Worker:
+1. Lark 開発者コンソールで新しい App Secret を生成し、値をコピーします。
+2. Worker 側で以下を実行します:
    ```bash
    cd apps/webhook
-   wrangler secret put LARK_APP_SECRET     # paste new value
+   wrangler secret put LARK_APP_SECRET     # 新しい値を貼り付け
    wrangler deploy
    ```
-3. If the brain image was built with a baked-in lark-cli token (it should
-   not be — prefer runtime `lark-cli config init`), rebuild the image so the
-   new App Secret is used.
-4. Re-run `lark-cli auth status` on any machine that uses the CLI and, if
-   needed, `lark-cli config init` to refresh.
-5. Revoke the old App Secret in the Lark Dev Console.
+3. brain のイメージに lark-cli トークンを焼き込んでいる場合 (本来は避けるべきで、
+   実行時の `lark-cli config init` を推奨) は、新しい App Secret を使うように
+   イメージを再ビルドしてください。
+4. CLI を使っているマシンで `lark-cli auth status` を再実行し、必要であれば
+   `lark-cli config init` で認証情報を更新します。
+5. Lark 開発者コンソールで古い App Secret を失効させます。
 
-### Verification
+### 検証チェックリスト
 
-- [ ] `wrangler tail` shows no 401 from Lark Open API after rotation.
-- [ ] `lark-cli auth status` reports the expected App ID without errors.
-- [ ] A test message to the bot still produces a reply.
+- [ ] ローテーション後、`wrangler tail` で Lark Open API からの 401 が出ていない。
+- [ ] `lark-cli auth status` が期待する App ID をエラーなく表示する。
+- [ ] Bot へのテストメッセージに対して引き続き返信が返ってくる。
 
 ---
 
-## 2. Rotate `LARK_VERIFICATION_TOKEN`
+## 2. `LARK_VERIFICATION_TOKEN` のローテーション
 
-Impact: during the swap window, incoming Lark events will fail signature
-verification. Keep the window under 30 seconds.
+影響: 切り替え中のウィンドウの間、受信した Lark イベントの署名検証が失敗します。
+ウィンドウは 30 秒以内に収めてください。
 
-1. Generate the new token in the Lark Dev Console but do not save yet.
-2. On the Worker:
+1. Lark 開発者コンソールで新しいトークンを生成しますが、まだ保存はしません。
+2. Worker 側で以下を実行します:
    ```bash
    wrangler secret put LARK_VERIFICATION_TOKEN
    wrangler deploy
    ```
-3. Immediately save the new token in the Lark Dev Console, then click
-   "Verify" on the Event Subscription URL.
-4. Watch `wrangler tail` for a minute; you should not see signature
-   rejections in `audit`.
+3. すぐに Lark 開発者コンソールで新しいトークンを保存し、Event Subscription URL の
+   「Verify」をクリックします。
+4. `wrangler tail` を 1 分ほど観察し、`audit` に署名拒否のログが出ていないことを
+   確認します。
 
-### Verification
+### 検証チェックリスト
 
-- [ ] Lark Dev Console "Verify" on the Event URL returns OK after rotation.
-- [ ] `wrangler tail` shows `/lark/event` 200s for a new test message.
-- [ ] No new rows in `audit` with `kind='signature_failed'`.
+- [ ] ローテーション後、Lark 開発者コンソールの Event URL に対する「Verify」が OK を返す。
+- [ ] 新しいテストメッセージに対して `wrangler tail` が `/lark/event` の 200 を表示する。
+- [ ] `audit` に `kind='signature_failed'` の新しい行が増えていない。
 
 ---
 
-## 3. Rotate `LARK_ENCRYPT_KEY`
+## 3. `LARK_ENCRYPT_KEY` のローテーション
 
-Impact: same as verification token — a short window where Lark encrypts with
-the new key while Worker still decrypts with the old one.
+影響: verification token と同様で、Lark が新しい鍵で暗号化する一方で Worker が古い
+鍵で復号しようとする短いウィンドウが発生します。
 
-1. Generate the new Encrypt Key in the Lark Dev Console.
+1. Lark 開発者コンソールで新しい Encrypt Key を生成します。
 2. ```bash
    wrangler secret put LARK_ENCRYPT_KEY
    wrangler deploy
    ```
-3. Save the new key in the Lark Dev Console.
+3. Lark 開発者コンソールで新しい鍵を保存します。
 
-### Verification
+### 検証チェックリスト
 
-- [ ] Test message from Lark still produces a reply card.
-- [ ] `wrangler tail` shows no `decrypt_failed` entries.
+- [ ] Lark からのテストメッセージに対して引き続き返信カードが返ってくる。
+- [ ] `wrangler tail` に `decrypt_failed` のエントリが出ていない。
 
 ---
 
-## 4. Rotate `BRAIN_SHARED_SECRET` (zero-downtime)
+## 4. `BRAIN_SHARED_SECRET` のローテーション (ゼロダウンタイム)
 
-Impact: none if you use dual-accept.
+影響: dual-accept を使う場合はゼロ。
 
-The brain should be patched to accept either `BRAIN_SHARED_SECRET` or
-`BRAIN_SHARED_SECRET_NEXT` while you rotate. Until that patch lands, follow
-the fast variant below.
+brain 側を、ローテーション中に `BRAIN_SHARED_SECRET` と `BRAIN_SHARED_SECRET_NEXT` の
+両方を受理できるように改修しておくべきです。その改修が入るまでは、後述の「高速版」
+手順を使ってください。
 
-### Dual-accept variant
+### Dual-accept 版
 
-1. Generate new secret: `NEW=$(openssl rand -base64 48)`.
-2. Set `BRAIN_SHARED_SECRET_NEXT=$NEW` on the brain container:
+1. 新しいシークレットを生成します: `NEW=$(openssl rand -base64 48)`。
+2. brain コンテナに `BRAIN_SHARED_SECRET_NEXT=$NEW` を設定します:
    ```bash
    fly secrets set BRAIN_SHARED_SECRET_NEXT="$NEW" -a lark-brain
    ```
-   Container restarts; both old and new are now accepted.
-3. Flip the Worker:
+   コンテナが再起動し、これで新旧両方の値が受理される状態になります。
+3. Worker を切り替えます:
    ```bash
    cd apps/webhook
-   wrangler secret put BRAIN_SHARED_SECRET     # paste NEW
+   wrangler secret put BRAIN_SHARED_SECRET     # NEW を貼り付け
    wrangler deploy
    ```
-4. On the brain: promote `NEXT` to primary and remove the old value.
+4. brain 側で `NEXT` をプライマリに昇格させ、古い値を削除します。
    ```bash
    fly secrets set BRAIN_SHARED_SECRET="$NEW" -a lark-brain
    fly secrets unset BRAIN_SHARED_SECRET_NEXT -a lark-brain
    ```
 
-### Fast variant (brief window)
+### 高速版 (短いウィンドウあり)
 
-If dual-accept is not yet implemented:
+dual-accept がまだ実装されていない場合:
 
-1. `fly secrets set BRAIN_SHARED_SECRET="$NEW"` on the brain.
-2. Immediately `wrangler secret put BRAIN_SHARED_SECRET` and
-   `wrangler deploy` on the Worker.
-3. Any Lark events in between will fail with 401 from the brain and Lark
-   will retry.
+1. brain 側で `fly secrets set BRAIN_SHARED_SECRET="$NEW"` を実行します。
+2. 直ちに Worker 側で `wrangler secret put BRAIN_SHARED_SECRET` と
+   `wrangler deploy` を実行します。
+3. この間に発生した Lark イベントは brain から 401 が返りますが、Lark が
+   リトライしてくれます。
 
-### Verification
+### 検証チェックリスト
 
-- [ ] `curl -H "Authorization: Bearer $NEW" $BRAIN_URL/healthz` returns 200.
-- [ ] `curl -H "Authorization: Bearer $OLD" $BRAIN_URL/healthz` returns 401.
-- [ ] A test message to the bot still produces a reply.
+- [ ] `curl -H "Authorization: Bearer $NEW" $BRAIN_URL/healthz` が 200 を返す。
+- [ ] `curl -H "Authorization: Bearer $OLD" $BRAIN_URL/healthz` が 401 を返す。
+- [ ] Bot へのテストメッセージに対して引き続き返信が返ってくる。
 
 ---
 
-## 5. Rotate `ANTHROPIC_API_KEY`
+## 5. `ANTHROPIC_API_KEY` のローテーション
 
-Impact: none. Anthropic keys can be rotated freely.
+影響: なし。Anthropic の API キーは自由にローテーション可能です。
 
-1. Create a new key in the Anthropic Console.
+1. Anthropic コンソールで新しいキーを発行します。
 2. ```bash
    fly secrets set ANTHROPIC_API_KEY="sk-ant-..." -a lark-brain
    ```
-3. Also update the Worker copy (if it's forwarded):
+3. Worker 側にも転送用のコピーがある場合は更新します:
    ```bash
    cd apps/webhook
    wrangler secret put ANTHROPIC_API_KEY
    wrangler deploy
    ```
-4. Revoke the old key in the Anthropic Console after a few minutes.
+4. 数分経過してから Anthropic コンソールで古いキーを失効させます。
 
-### Verification
+### 検証チェックリスト
 
-- [ ] A test message to the bot still produces a reply.
-- [ ] Anthropic Console shows usage on the new key within 5 minutes.
-- [ ] `fly logs -a lark-brain` shows no 401 from `api.anthropic.com`.
+- [ ] Bot へのテストメッセージに対して引き続き返信が返ってくる。
+- [ ] 5 分以内に Anthropic コンソール上で新しいキーの使用量が表示される。
+- [ ] `fly logs -a lark-brain` に `api.anthropic.com` からの 401 が出ていない。
 
 ---
 
-## Related documents
+## 関連ドキュメント
 
 - `docs/architecture/security.md`
 - `docs/runbook/deploy.md`

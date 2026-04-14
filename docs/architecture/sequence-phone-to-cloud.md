@@ -1,23 +1,24 @@
-# Sequence: Phone → Lark Bot → Card Reply
+# シーケンス: スマートフォン → Lark ボット → カード返信
 
-This document walks through a single turn on the cloud path: a user types a
-message to the Lark bot on their phone, and a reply card comes back. For the
-static architecture, see `docs/architecture/overview.md`.
+このドキュメントでは、クラウド経路における 1 ターンの流れを解説します。すなわち、
+ユーザーがスマートフォンから Lark ボットにメッセージを入力し、返信カードが返って
+くるまでの流れです。静的なアーキテクチャについては
+`docs/architecture/overview.md` を参照してください。
 
-## Actors
+## 登場要素
 
-- **User / Lark client** — phone app
-- **Lark Open Platform** — message routing, signature generation
-- **Worker** — `apps/webhook`, Hono on Cloudflare
-- **DO** — `ConversationDO` inside the Worker, one instance per `session_id`
+- **User / Lark client** — スマートフォンアプリ
+- **Lark Open Platform** — メッセージのルーティングおよび署名生成
+- **Worker** — `apps/webhook`、Cloudflare 上の Hono
+- **DO** — Worker 内の `ConversationDO`、`session_id` ごとに 1 インスタンス
 - **D1** — `apps/webhook/migrations/0001_init.sql`
-- **Brain** — `apps/brain`, Hono container, `POST /invoke`
-- **Claude Agent SDK** — `@anthropic-ai/claude-agent-sdk` `query()` in brain
-- **Child MCP** — `apps/brain/dist/tools/mcp-server.js` (`send_reply_text`,
-  `send_reply_card`, `log_step`)
-- **lark-cli** — `@larksuite/cli`, installed globally in the brain image
+- **Brain** — `apps/brain`、Hono コンテナ、`POST /invoke`
+- **Claude Agent SDK** — ブレイン内の `@anthropic-ai/claude-agent-sdk` `query()`
+- **Child MCP** — `apps/brain/dist/tools/mcp-server.js` (`send_reply_text`、
+  `send_reply_card`、`log_step`)
+- **lark-cli** — `@larksuite/cli`、ブレインのイメージにグローバルインストール済み
 
-## Mermaid sequence
+## Mermaid シーケンス
 
 ```mermaid
 sequenceDiagram
@@ -58,60 +59,61 @@ sequenceDiagram
     W-->>L: 200 OK
 ```
 
-## Step-by-step notes
+## ステップごとの補足
 
-1. **Signature verification** — The Worker computes HMAC over
-   `timestamp + nonce + body` using `LARK_VERIFICATION_TOKEN` and rejects on
-   mismatch. If `LARK_ENCRYPT_KEY` is configured, the inner `encrypt` field is
-   AES-decrypted before JSON parsing.
+1. **署名検証** — Worker は `LARK_VERIFICATION_TOKEN` を用いて
+   `timestamp + nonce + body` に対して HMAC を計算し、不一致のものは拒否します。
+   `LARK_ENCRYPT_KEY` が設定されている場合、内側の `encrypt` フィールドを JSON
+   パースの前に AES 復号します。
 
-2. **Routing by event type** — `url_verification` returns the challenge
-   inline. `im.message.receive_v1` proceeds to the DO path. Card actions hit
-   `/lark/card-action` and follow an abbreviated variant (same DO, no brain
-   call for simple ack).
+2. **イベントタイプによるルーティング** — `url_verification` はインラインで
+   challenge を返します。`im.message.receive_v1` は DO 経路に進みます。カード
+   アクションは `/lark/card-action` に到達し、短縮版のバリアント（同じ DO、
+   単純な ack ではブレイン呼び出しなし）に従います。
 
-3. **DO enqueue** — The Worker selects the DO by
-   `env.CONVERSATION.idFromName(session_id)`. The DO is a single-writer for
-   that conversation, so two rapid messages in the same thread will serialize
-   naturally without explicit locks.
+3. **DO エンキュー** — Worker は
+   `env.CONVERSATION.idFromName(session_id)` で DO を選択します。DO はその会話の
+   唯一のライターであるため、同じスレッドで連続して送られた 2 つのメッセージは、
+   明示的なロックなしに自然に直列化されます。
 
-4. **DO persistence** — Inside the DO, the user message is appended to the
-   `messages` table in D1 before calling the brain. This guarantees we have
-   an audit trail even if the brain call fails.
+4. **DO 永続化** — DO 内では、ブレインを呼び出す前にユーザーメッセージを D1 の
+   `messages` テーブルへ追記します。これにより、ブレイン呼び出しが失敗しても
+   監査証跡が確実に残ります。
 
-5. **Brain call** — `POST /invoke` on `BRAIN_URL` with
-   `Authorization: Bearer BRAIN_SHARED_SECRET`. Body carries the trimmed
-   history and the new user message. The Worker does not wait for the *final*
-   Lark reply — the brain returns once the reply card has been successfully
-   posted via lark-cli.
+5. **ブレイン呼び出し** — `BRAIN_URL` への `POST /invoke` を
+   `Authorization: Bearer BRAIN_SHARED_SECRET` 付きで実行します。ボディには
+   トリム済みの履歴と新しいユーザーメッセージが含まれます。Worker は Lark への
+   *最終* 返信は待ちません。ブレインは lark-cli 経由で返信カードの送信に成功した
+   時点で応答を返します。
 
-6. **Agent loop** — Inside `runBrain()`, Claude Agent SDK `query()` is called
-   with a Lark-specific system prompt, the `Bash` tool (constrained to
-   `lark-cli` by prompt policy), and the three-tool child MCP. The SDK drives
-   the tool-use loop until the model emits a final reply and calls
-   `send_reply_text` or `send_reply_card`.
+6. **エージェントループ** — `runBrain()` 内で、Lark 専用のシステムプロンプト、
+   （プロンプトポリシーにより `lark-cli` に制約された）`Bash` ツール、および
+   3 ツールの子 MCP とともに Claude Agent SDK の `query()` が呼ばれます。SDK は
+   モデルが最終返信を出力し `send_reply_text` または `send_reply_card` を
+   呼ぶまで tool-use ループを駆動します。
 
-7. **Reply delivery** — `send_reply_card` runs `lark-cli im send-card` which
-   hits `im/v1/messages` on Lark Open API. Because lark-cli holds the bot
-   token, no per-user OAuth is required for the bot to reply in a chat it is
-   already a member of.
+7. **返信の配信** — `send_reply_card` は `lark-cli im send-card` を実行し、
+   Lark Open API の `im/v1/messages` を叩きます。lark-cli はボットトークンを
+   保持しているため、ボットが既にメンバーであるチャットに返信する場合はユーザー
+   単位の OAuth は不要です。
 
-8. **Assistant persistence** — After the brain acks, the DO writes the
-   assistant message to D1 and returns. The Worker responds 200 to Lark.
+8. **アシスタントメッセージの永続化** — ブレインが ack した後、DO はアシスタント
+   メッセージを D1 に書き込み、応答を返します。Worker は Lark に 200 を返します。
 
-## Timeouts and failure modes
+## タイムアウトと障害モード
 
-- **Worker → DO**: in-process, effectively instant.
-- **DO → Brain**: bounded by Worker subrequest timeout. If the brain is slow,
-  the DO should send an interim `send_reply_text("Thinking…")` via the child
-  MCP. (This is an optimization; the MVP acks Lark in ≤3s by relying on the
-  brain being quick or returning an interim ack first.)
-- **Brain → lark-cli**: bounded by `LARK_CLI_BIN` process lifetime. Long
-  tools (e.g. a large search) should be split at the agent level.
-- **Idempotency**: Lark retries events on 5xx. The DO uses `session_id +
-  event_id` to dedupe; duplicate events short-circuit before the brain call.
+- **Worker → DO**: プロセス内なので、実質的に即時です。
+- **DO → Brain**: Worker のサブリクエストタイムアウトに律速されます。ブレインが
+  遅い場合、DO は子 MCP 経由で中間的な `send_reply_text("Thinking…")` を送るべき
+  です。(これは最適化です。MVP ではブレインが高速であるか、先に中間 ack を返す
+  ことに頼って 3 秒以内に Lark へ ack します。)
+- **Brain → lark-cli**: `LARK_CLI_BIN` プロセスのライフタイムに律速されます。
+  長時間ツール（例: 大きな検索）はエージェントレベルで分割すべきです。
+- **冪等性**: Lark は 5xx 応答時にイベントを再送します。DO は
+  `session_id + event_id` で重複排除します。重複イベントはブレイン呼び出しの
+  前に短絡されます。
 
-## Related documents
+## 関連ドキュメント
 
 - `docs/architecture/overview.md`
 - `docs/architecture/data-model.md`

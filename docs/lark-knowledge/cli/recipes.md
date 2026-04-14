@@ -1,4 +1,4 @@
-# lark-mcp — Recipes (Copy & Paste 起動行集)
+# lark-mcp — レシピ集 (コピペ用 起動行集)
 
 典型的な利用シナリオごとの起動行テンプレート。コピペして `<app_id>` / `<app_secret>` を
 置き換えるだけで動作します。

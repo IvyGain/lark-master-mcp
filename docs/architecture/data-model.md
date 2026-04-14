@@ -1,113 +1,112 @@
-# Data Model
+# データモデル
 
-Persistence for the cloud path lives entirely inside `apps/webhook`.
-The brain container is stateless. The source of truth for the schema is
-`apps/webhook/migrations/0001_init.sql`. Bindings are declared in
-`apps/webhook/wrangler.jsonc`:
+クラウド経路の永続化はすべて `apps/webhook` の内部に存在します。ブレインコンテナは
+ステートレスです。スキーマの信頼できる情報源は
+`apps/webhook/migrations/0001_init.sql` です。バインディングは
+`apps/webhook/wrangler.jsonc` で宣言されています:
 
-| Binding | Kind | Purpose |
-|---------|------|---------|
-| `DB` | D1 | Relational store for users, tokens, conversations, messages, audit. |
-| `CACHE` | KV | Short-lived caches (e.g. app access token, dedupe keys). |
-| `CONVERSATION` | Durable Object | Per-`session_id` single-writer for a conversation turn. |
+| Binding | Kind | 役割 |
+|---------|------|------|
+| `DB` | D1 | users、tokens、conversations、messages、audit 用のリレーショナルストア。 |
+| `CACHE` | KV | 短命なキャッシュ (例: app access token、重複排除キー)。 |
+| `CONVERSATION` | Durable Object | 会話ターンの `session_id` ごとの単一ライター。 |
 
 ---
 
 ## D1: `lark-master`
 
-Five tables. Exact column lists live in the migration; the table below is
-the semantic summary.
+テーブルは 5 つです。正確なカラム一覧はマイグレーションにあります。以下の表は
+セマンティクスのサマリーです。
 
 ### `users`
 
-One row per Lark user that has interacted with the bot or completed OAuth.
+ボットとやり取りしたか OAuth を完了した Lark ユーザー 1 人につき 1 行。
 
-- Primary key: `open_id` (stable per app).
-- Secondary: `tenant_key`, `union_id`.
-- Profile fields populated from `contact.user.get` when available.
-- Rows are upserted on first message.
+- 主キー: `open_id` (アプリごとに安定)。
+- セカンダリ: `tenant_key`、`union_id`。
+- プロフィールフィールドは `contact.user.get` で取得できる場合に埋められます。
+- 初回メッセージ時に upsert されます。
 
 ### `tokens`
 
-Per-user OAuth tokens after the "Add to Lark" flow in `apps/web`.
+`apps/web` の「Add to Lark」フロー後のユーザーごとの OAuth トークン。
 
-- One row per `(open_id, scope_set)`.
-- Columns: `access_token`, `refresh_token`, `expires_at`, `scope`,
-  `created_at`, `updated_at`.
-- **Encryption status: TODO.** Currently the values are stored as plaintext
-  UTF-8. Before production, wrap write/read with AES-GCM keyed off a Worker
-  secret (e.g. `TOKEN_ENCRYPTION_KEY`, 32 bytes base64). See
-  `docs/architecture/security.md`.
+- `(open_id, scope_set)` ごとに 1 行。
+- カラム: `access_token`、`refresh_token`、`expires_at`、`scope`、
+  `created_at`、`updated_at`。
+- **暗号化ステータス: TODO。** 現状は値がプレーンな UTF-8 として保存されています。
+  本番投入前に、Worker シークレット（例: `TOKEN_ENCRYPTION_KEY`、32 バイト
+  base64）で鍵を生成し、書き込み/読み出しを AES-GCM でラップする必要があります。
+  `docs/architecture/security.md` を参照してください。
 
 ### `conversations`
 
-One row per `session_id` (derived from `(tenant_key, chat_id, thread_id |
-open_id)`).
+`session_id` ごとに 1 行 (`(tenant_key, chat_id, thread_id | open_id)` から導出)。
 
-- Tracks `created_at`, `last_message_at`, `turn_count`,
-  `status` (`active` | `paused` | `archived`).
-- Used by the DO to hydrate recent context and by dashboards to list active
-  threads.
+- `created_at`、`last_message_at`、`turn_count`、`status`
+  (`active` | `paused` | `archived`) を追跡します。
+- DO による直近コンテキストのハイドレートや、ダッシュボードでのアクティブ
+  スレッド一覧表示に使用されます。
 
 ### `messages`
 
-Append-only message log.
+追記のみのメッセージログ。
 
-- Columns: `id`, `session_id`, `role` (`user` | `assistant` | `tool` |
-  `system`), `content`, `tool_name`, `tool_input`, `tool_output`,
-  `created_at`.
-- Written twice per turn: once for the user message (before the brain
-  call), once for the final assistant reply (after the brain returns).
-- Optional: `log_step` from the child MCP can persist `tool` rows for
-  observability.
+- カラム: `id`、`session_id`、`role` (`user` | `assistant` | `tool` |
+  `system`)、`content`、`tool_name`、`tool_input`、`tool_output`、
+  `created_at`。
+- 1 ターンあたり 2 回書き込まれます: ユーザーメッセージ用（ブレイン呼び出しの
+  前）に 1 回、最終的なアシスタント返信用（ブレインが返った後）に 1 回。
+- 任意: 子 MCP の `log_step` は、可観測性のために `tool` 行を永続化できます。
 
 ### `audit`
 
-Security- and operator-facing events.
+セキュリティおよび運用担当者向けのイベント。
 
-- Signature verification failures, OAuth callbacks, token refreshes, rate
-  limits, secret rotations.
-- Intended to be drained to Logpush or queried via `wrangler d1 execute`.
+- 署名検証の失敗、OAuth コールバック、トークンリフレッシュ、レートリミット、
+  シークレットのローテーション。
+- Logpush にドレインしたり、`wrangler d1 execute` でクエリする想定です。
 
 ---
 
 ## Durable Object: `ConversationDO`
 
-One instance per `session_id`. The DO is the single-writer for a
-conversation, which gives us serialization without explicit locks.
+`session_id` ごとに 1 インスタンス。DO は会話の単一ライターなので、明示的な
+ロックなしに直列化を実現できます。
 
-### Storage keys
+### ストレージキー
 
-| Key | Value | Notes |
-|-----|-------|-------|
-| `session_id` | `string` | Identity of this DO, matches the name used in `idFromName`. |
-| `last_event_id` | `string` | For Lark retry dedupe. |
-| `in_flight` | `boolean` | Set while a brain call is outstanding. Rejects new events with 429 if the caller wants fast-fail. |
-| `pending_interim` | `object` | Scratchpad if we decide to send a "Thinking…" placeholder. |
-| `history_cursor` | `number` | Pointer into D1 `messages` so we don't re-hydrate on every turn. |
+| Key | Value | 備考 |
+|-----|-------|------|
+| `session_id` | `string` | この DO の識別子。`idFromName` で使った名前と一致します。 |
+| `last_event_id` | `string` | Lark の再送に対する重複排除用。 |
+| `in_flight` | `boolean` | ブレイン呼び出しが未応答の間に true になります。呼び出し側が fast-fail を望む場合、新規イベントを 429 で拒否します。 |
+| `pending_interim` | `object` | 「Thinking…」のプレースホルダーを送ると決めた場合のスクラッチパッド。 |
+| `history_cursor` | `number` | 毎ターンの再ハイドレーションを避けるための D1 `messages` へのポインタ。 |
 
-### Concurrency guarantees
+### 並行性の保証
 
-- Cloudflare guarantees a single JavaScript turn at a time per DO instance.
-- Two phone messages in the same thread therefore serialize through the same
-  DO and cannot interleave brain calls.
-- Cross-thread parallelism is unbounded — two different users hit two
-  different DOs.
-
----
-
-## What is *not* stored
-
-- `apps/brain` has no database. Its only mutable state is the running Claude
-  Agent SDK tool loop for the current request.
-- `apps/mcp-server` has no database. It relies on `~/.lark-cli` on the local
-  machine.
-- We do not mirror Lark messages outside D1. The user's Lark inbox is the
-  product's source of truth for conversation history; D1 is our audit copy.
+- Cloudflare は DO インスタンスあたり同時に 1 つの JavaScript ターンしか実行
+  しないことを保証します。
+- よって同一スレッドに対する 2 つのスマートフォンメッセージは同じ DO を
+  通じて直列化され、ブレイン呼び出しがインターリーブすることはありません。
+- スレッドをまたぐ並列性には制限はありません。異なるユーザー 2 名は異なる 2 つの
+  DO にヒットします。
 
 ---
 
-## Migration workflow
+## 保存*しない*もの
+
+- `apps/brain` にはデータベースがありません。唯一の可変状態は、現在のリクエストで
+  動作している Claude Agent SDK のツールループです。
+- `apps/mcp-server` にはデータベースがありません。ローカルマシン上の
+  `~/.lark-cli` に依存します。
+- Lark のメッセージを D1 の外部にミラーリングすることはしません。ユーザーの Lark
+  受信箱が会話履歴に対するプロダクトの正です。D1 は我々の監査コピーです。
+
+---
+
+## マイグレーションのワークフロー
 
 ```bash
 # Apply a migration locally
@@ -117,10 +116,10 @@ wrangler d1 migrations apply lark-master --local
 wrangler d1 migrations apply lark-master --remote
 ```
 
-New migrations must be added as `apps/webhook/migrations/000N_*.sql` and
-committed. Never edit `0001_init.sql` after deploy.
+新しいマイグレーションは `apps/webhook/migrations/000N_*.sql` として追加し、
+コミットする必要があります。デプロイ後に `0001_init.sql` を編集しないでください。
 
-## Related documents
+## 関連ドキュメント
 
 - `docs/architecture/overview.md`
 - `docs/architecture/security.md`

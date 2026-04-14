@@ -1,6 +1,6 @@
-# @larksuiteoapi/node-sdk — Client Initialization
+# @larksuiteoapi/node-sdk — クライアント初期化
 
-> **Source**: https://github.com/larksuite/node-sdk/blob/main/README.zh.md
+> **原典**: https://github.com/larksuite/node-sdk/blob/main/README.zh.md
 
 ## インストール
 
@@ -10,7 +10,7 @@ npm install @larksuiteoapi/node-sdk
 yarn add @larksuiteoapi/node-sdk
 ```
 
-## 基本的な Client 生成
+## 基本的なクライアント生成
 
 ```ts
 import * as lark from '@larksuiteoapi/node-sdk';
@@ -25,7 +25,7 @@ const client = new lark.Client({
 });
 ```
 
-## Domain 定数
+## ドメイン定数
 
 | 値 | URL |
 |---|---|
@@ -34,9 +34,9 @@ const client = new lark.Client({
 
 文字列で直接指定することも可能。
 
-## App 種別
+## アプリ種別
 
-### Self-built App (Custom App)
+### セルフビルドアプリ (Custom App)
 
 ```ts
 const client = new lark.Client({
@@ -46,7 +46,7 @@ const client = new lark.Client({
 });
 ```
 
-### ISV (Marketplace App)
+### ISV (マーケットプレイスアプリ)
 
 ```ts
 const client = new lark.Client({
@@ -62,12 +62,12 @@ const result = await client.im.message.create(
 );
 ```
 
-本プロジェクト `lark-master-mcp` は Self-built App 前提 (初回セットアップで Custom App を
+本プロジェクト `lark-master-mcp` はセルフビルドアプリ前提です (初回セットアップで Custom App を
 作成)。
 
 ## トークン管理
 
-Client は App ID / App Secret から **tenant_access_token** を自動取得・キャッシュ・
+クライアントは App ID / App Secret から **tenant_access_token** を自動取得・キャッシュ・
 リフレッシュします。開発者側でトークンを直接扱う必要はありません。
 
 ```ts

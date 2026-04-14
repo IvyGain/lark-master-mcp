@@ -1,8 +1,8 @@
 # @larksuite/cli — 公式 AI Agent Skills
 
-> **Source**: https://github.com/larksuite/cli
-> **Installed**: 2026-04-14
-> **Version at install**: lark-cli v1.0.9 (23 skills)
+> **原典**: https://github.com/larksuite/cli
+> **導入日**: 2026-04-14
+> **導入時バージョン**: lark-cli v1.0.9 (23 スキル)
 
 `@larksuite/cli` (npm: `@larksuite/cli`, binary: `lark-cli`) は Lark/Feishu Open Platform 公式
 CLI で、14 業務ドメイン・200+ コマンド・2500+ API エンドポイント・**22+ AI Agent Skills** を
@@ -18,7 +18,7 @@ CLI / GitHub Copilot 等の主要 AI コーディング環境を **公式サポ�
 
 | Upstream | 役割 | 場所 |
 |---|---|---|
-| `@larksuite/cli` | 対話的 CLI + AI Agent Skills | `.agents/skills/lark-*` (symlinked to `.claude/skills/`) |
+| `@larksuite/cli` | 対話的 CLI + AI Agent Skills | `.agents/skills/lark-*` (`.claude/skills/` からシンボリックリンク) |
 | `@larksuiteoapi/lark-mcp` | MCP サーバ (Claude Desktop への常駐ツール提供) | `claude_desktop_config.json` 経由 |
 
 ## インストール (実行済み)
@@ -41,7 +41,7 @@ npx -y skills add larksuite/cli -s lark-im -y
 インストール後の配置:
 
 ```
-.agents/skills/                    ← universal (Codex/Cursor/Gemini/Copilot/Amp 他)
+.agents/skills/                    ← 汎用 (Codex/Cursor/Gemini/Copilot/Amp 他)
 ├── lark-shared/        (基盤 - 必ず最初に参照)
 ├── lark-calendar/
 ├── lark-im/
@@ -66,15 +66,15 @@ npx -y skills add larksuite/cli -s lark-im -y
 ├── lark-workflow-meeting-summary/
 └── lark-workflow-standup-report/
 
-.claude/skills/                    ← Claude Code 用 symlink
-└── lark-* (上記全てへ symlink)
+.claude/skills/                    ← Claude Code 用シンボリックリンク
+└── lark-* (上記全てへシンボリックリンク)
 ```
 
 ## 3 層コマンドモデル
 
 lark-cli は 3 つの粒度でコマンドを提供:
 
-### Layer 1: ショートカット (`+` プレフィクス)
+### レイヤー 1: ショートカット (`+` プレフィクス)
 
 人間 / AI が最も速く使える高レベルコマンド。スマートデフォルト付き。
 
@@ -85,16 +85,16 @@ lark-cli docs +create --title "Weekly Report"
 lark-cli contact +search-user --query "John"
 ```
 
-### Layer 2: API コマンド (100+)
+### レイヤー 2: API コマンド (100+)
 
-Open Platform endpoint に 1:1 マッピング。構造化された引数で型安全。
+Open Platform エンドポイントに 1:1 マッピング。構造化された引数で型安全。
 
 ```bash
 lark-cli calendar calendars list
 lark-cli calendar events instance_view --params '{"calendar_id":"primary","start_time":"1700000000","end_time":"1700086400"}'
 ```
 
-### Layer 3: 生 API 呼び出し (2500+)
+### レイヤー 3: 生 API 呼び出し (2500+)
 
 任意の Lark OpenAPI を直叩き:
 
@@ -107,9 +107,9 @@ lark-cli api POST /open-apis/im/v1/messages --params '{"receive_id_type":"open_i
 
 | フラグ | 用途 |
 |---|---|
-| `--params <json>` | URL/query パラメータ |
-| `--data <json>` | リクエストボディ (POST/PATCH/PUT/DELETE) |
-| `--as user\|bot\|auto` | 身份切替 (ユーザー / Bot / 自動) |
+| `--params <json>` | URL / クエリパラメータ |
+| `--data <json>` | リクエストボディ (POST / PATCH / PUT / DELETE) |
+| `--as user\|bot\|auto` | 実行主体切替 (ユーザー / Bot / 自動) |
 | `--format json\|pretty\|table\|ndjson\|csv` | 出力フォーマット |
 | `--page-all` | 自動ページング (全ページ取得) |
 | `--page-size <N>` / `--page-limit <N>` / `--page-delay <MS>` | ページング制御 |
@@ -130,9 +130,9 @@ lark-cli api POST /open-apis/im/v1/messages --params '{"receive_id_type":"open_i
 
 フラグ:
 - `--domain calendar,task` — ドメインフィルタ
-- `--recommend` — auto-approval 可能なスコープを自動承認
+- `--recommend` — 自動承認可能なスコープを自動承認
 - `--scope "calendar:calendar:read"` — 明示スコープ指定
-- `--no-wait` — Agent 向けノンブロッキングモード
+- `--no-wait` — Agent 向けのノンブロッキングモード
 
 ## 初回セットアップ (`config init`)
 
@@ -141,24 +141,24 @@ lark-cli api POST /open-apis/im/v1/messages --params '{"receive_id_type":"open_i
 lark-cli config init --new
 ```
 
-`lark-shared` スキルの指示に従い、Claude は **background** でこのコマンドを実行し、出力から
-authorize URL を抽出してユーザーに提示する設計。これが **"Lark 開発者コンソールを触らない"
-実現方法** の公式ルート。
+`lark-shared` スキルの指示に従い、Claude は **バックグラウンド** でこのコマンドを実行し、出力から
+authorize URL を抽出してユーザーに提示する設計。これが **「Lark 開発者コンソールを触らない」
+実現方法** の公式ルートです。
 
-## 身份 (Identity) の使い分け
+## 実行主体 (Identity) の使い分け
 
-| 身份 | フラグ | 取得方法 | 用途 |
+| 実行主体 | フラグ | 取得方法 | 用途 |
 |---|---|---|---|
 | user | `--as user` | `lark-cli auth login` | 個人リソース (自分のカレンダー / Docs / Base) |
 | bot | `--as bot` | 自動 (appId + appSecret のみ) | App 自身のリソース / Bot として送信 |
 
 **重要な注意**:
 
-- Bot 身份ではユーザー個人の日程・Docs・Drive・Mail は **見えない** (例: `--as bot` で日程取得
-  すると bot 自身の空カレンダー)
-- Bot 身份では **ユーザー代理操作も不可** (Bot 名義での送信・作成になる)
-- Bot スコープは開発者コンソールで scope 申請するだけで利用可 (`auth login` 不要)
-- User スコープは **コンソールで scope 申請 + ユーザーが `auth login` で承認** の 2 段階が必要
+- Bot 主体ではユーザー個人の日程・Docs・Drive・Mail は **見えません** (例: `--as bot` で日程取得
+  すると Bot 自身の空カレンダーが返ります)
+- Bot 主体では **ユーザー代理操作も不可** (Bot 名義での送信・作成になります)
+- Bot スコープは開発者コンソールで申請するだけで利用可 (`auth login` 不要)
+- User スコープは **コンソールで申請 + ユーザーが `auth login` で承認** の 2 段階が必要
 
 この挙動は `.agents/skills/lark-shared/SKILL.md` に詳細記述されています。
 
@@ -178,7 +178,7 @@ authorize URL を抽出してユーザーに提示する設計。これが **"La
 | Claude Desktop に MCP サーバとして常駐 | `@larksuiteoapi/lark-mcp` (MCP ツール 100+) |
 | Claude Code セッション内で CLI 的に操作 | `@larksuite/cli` + 公式スキル (CLI 3 層 + 2500+ API) |
 | スクリプト / CI から叩く | `@larksuite/cli` (CLI 層が豊富) |
-| 細かな scope / 身份切替 | `@larksuite/cli` (`--as` / `--scope`) |
+| 細かなスコープ / 実行主体切替 | `@larksuite/cli` (`--as` / `--scope`) |
 | カスタム MCP ツールを自作 | `@larksuiteoapi/node-sdk` を直接 import |
 
 本プロジェクト `lark-master-mcp` の設計方針: **両方を同居** させ、ユーザーの文脈に応じて
@@ -202,5 +202,5 @@ lark-cli スキル経由 (対話) / lark-mcp 経由 (MCP クライアント) の
 
 - GitHub: https://github.com/larksuite/cli
 - Issues: https://github.com/larksuite/cli/issues
-- Agent Skills docs: https://github.com/larksuite/cli#agent-skills
-- Open Platform docs: https://open.feishu.cn/document/
+- Agent Skills ドキュメント: https://github.com/larksuite/cli#agent-skills
+- Open Platform ドキュメント: https://open.feishu.cn/document/

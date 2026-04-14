@@ -1,6 +1,6 @@
 # lark-mcp mcp (★最重要)
 
-> **Source**: https://github.com/larksuite/lark-openapi-mcp/blob/main/docs/reference/cli/cli.md
+> **原典**: https://github.com/larksuite/lark-openapi-mcp/blob/main/docs/reference/cli/cli.md
 > **保存日**: 2026-04-14
 
 MCP サーバを起動し、Lark OpenAPI を MCP ツールとして Claude Desktop / Claude Code /
@@ -24,19 +24,19 @@ npx -y @larksuiteoapi/lark-mcp mcp \
 
 | フラグ | 省略形 | 既定値 | 説明 |
 |---|---|---|---|
-| `--app-id` | `-a` | — | Application ID |
-| `--app-secret` | `-s` | — | Application secret |
-| `--domain` | `-d` | `https://open.feishu.cn` | API domain。International は `https://open.larksuite.com` |
-| `--user-access-token` | `-u` | — | user-level API 呼び出し用のトークンを明示指定 |
+| `--app-id` | `-a` | — | アプリケーション ID |
+| `--app-secret` | `-s` | — | アプリケーションシークレット |
+| `--domain` | `-d` | `https://open.feishu.cn` | API ドメイン。International 版では `https://open.larksuite.com` |
+| `--user-access-token` | `-u` | — | ユーザー権限 API 呼び出し用のトークンを明示指定 |
 | `--token-mode` | — | `auto` | `auto` / `tenant_access_token` / `user_access_token` のいずれか |
-| **`--oauth`** | — | off | 🌟 **MCP Auth Server を起動し、token 期限切れ時に自動でユーザーログインを要求 (Beta)** |
+| **`--oauth`** | — | off | 🌟 **MCP Auth Server を起動し、トークン期限切れ時に自動でユーザーログインを要求 (Beta)** |
 | `--scope` | — | — | OAuth で要求するスコープ一覧 |
 
 ### ツール制御系
 
 | フラグ | 省略形 | 既定値 | 説明 |
 |---|---|---|---|
-| `--tools` | `-t` | — | 有効化するツール (preset / 個別名) をスペース or カンマ区切り |
+| `--tools` | `-t` | — | 有効化するツール (プリセット / 個別名) をスペースまたはカンマ区切り |
 | `--tool-name-case` | `-c` | — | ツール名のケース変換。`snake` / `camel` / `dot` / `kebab` |
 | `--language` | `-l` | — | ドキュメント言語。`zh` / `en` |
 
@@ -44,23 +44,23 @@ npx -y @larksuiteoapi/lark-mcp mcp \
 
 | フラグ | 省略形 | 既定値 | 説明 |
 |---|---|---|---|
-| `--mode` | `-m` | — | MCP transport。`stdio` / `streamable` / `sse` |
-| `--host` | — | — | listening host (streamable / sse 時) |
-| `--port` | `-p` | — | listening port (streamable / sse 時) |
+| `--mode` | `-m` | — | MCP トランスポート。`stdio` / `streamable` / `sse` |
+| `--host` | — | — | 待ち受けホスト (streamable / sse 時) |
+| `--port` | `-p` | — | 待ち受けポート (streamable / sse 時) |
 
 ### その他
 
 | フラグ | 省略形 | 説明 |
 |---|---|---|
-| `--config` | — | JSON configuration file path |
-| `--version` | `-V` | Display version |
-| `--help` | `-h` | Display help |
+| `--config` | — | JSON 設定ファイルのパス |
+| `--version` | `-V` | バージョンを表示 |
+| `--help` | `-h` | ヘルプを表示 |
 
 ---
 
 ## 🌟 `--oauth` フラグ (AnyGen 風 UX の核)
 
-> "Enable MCP Auth Server to get user_access_token and auto request user login when token expires (Beta)"
+> MCP Auth Server を有効化して user_access_token を取得し、トークン期限切れ時には自動でユーザーログインを要求します (Beta)
 
 このフラグが本プロジェクトのユーザー体験の決め手です。
 

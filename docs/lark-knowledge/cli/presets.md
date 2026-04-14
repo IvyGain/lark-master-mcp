@@ -1,6 +1,6 @@
-# lark-mcp — Tool Presets
+# lark-mcp — ツールプリセット一覧
 
-> **Status**: upstream `@larksuiteoapi/lark-mcp` のソースから実装時に動的抽出予定。
+> **ステータス**: upstream `@larksuiteoapi/lark-mcp` のソースから実装時に動的抽出予定。
 > 下記は本プロジェクトが想定する **代表的プリセット** のスナップショット。
 
 ## プリセットの目的

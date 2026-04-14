@@ -1,7 +1,7 @@
-# lark-mcp CLI — Overview
+# lark-mcp CLI — 概要
 
-> **Source**: https://github.com/larksuite/lark-openapi-mcp
-> **CLI Reference**: https://github.com/larksuite/lark-openapi-mcp/blob/main/docs/reference/cli/cli.md
+> **原典**: https://github.com/larksuite/lark-openapi-mcp
+> **CLI リファレンス**: https://github.com/larksuite/lark-openapi-mcp/blob/main/docs/reference/cli/cli.md
 > **npm**: `@larksuiteoapi/lark-mcp`
 > **保存日**: 2026-04-14
 

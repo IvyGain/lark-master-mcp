@@ -1,42 +1,42 @@
-# Runbook: First-time Deploy
+# Runbook: 初回デプロイ手順
 
-End-to-end deploy checklist for the cloud path (`apps/webhook`, `apps/brain`,
-`apps/web`). The local MCP server (`apps/mcp-server`) is published separately
-to npm and is not part of this runbook.
+クラウド側 (`apps/webhook`, `apps/brain`, `apps/web`) のエンドツーエンド デプロイ チェックリスト。
+ローカル用 MCP サーバー (`apps/mcp-server`) は npm に別途公開するため、このランブックには含まれません。
 
-Target architecture: `docs/architecture/overview.md`.
+アーキテクチャ全体像: `docs/architecture/overview.md` を参照してください。
 
-Estimated time: ~60 minutes the first time, ~10 minutes on subsequent deploys.
+**所要時間の目安**: 初回は約 60 分、2 回目以降は約 10 分。
 
-## Prerequisites
+## 前提条件
 
-- Cloudflare account with Workers + D1 + Durable Objects enabled.
-- Fly.io account (interim container host until Cloudflare Containers GA) or
-  any Docker-capable host with a public URL.
-- Vercel account for `apps/web`.
-- Anthropic API key.
-- A Lark tenant you can register a Custom App against.
-- Local tools: `wrangler`, `fly` (or `flyctl`), `vercel`, `pnpm`.
+- Cloudflare アカウント (Workers + D1 + Durable Objects が有効になっていること)
+- Fly.io アカウント (Cloudflare Containers が GA になるまでの暫定コンテナホスト)。
+  Docker が動かせて公開 URL を持てる任意のホストでも代用可能。
+- Vercel アカウント (`apps/web` のデプロイ先)
+- Anthropic API キー
+- カスタムアプリを登録できる Lark テナント
+- ローカルに導入済みのツール: `wrangler`, `fly` (または `flyctl`), `vercel`, `pnpm`
 
 ---
 
-## a) Register the Lark Custom App
+## a) Lark カスタムアプリを登録する
 
-Follow `docs/lark-knowledge/dev-console-manual.md`. Capture the following
-values — you'll need them in step (d):
+`docs/lark-knowledge/dev-console-manual.md` の手順に従ってください。手順 (d) で必要になるので、
+以下の 4 つの値を控えておきます。
 
 - `App ID`
 - `App Secret`
 - `Verification Token`
-- `Encrypt Key` (optional, but recommended)
+- `Encrypt Key` (任意ですが、設定を推奨)
 
-Add scopes: `im:message`, `im:message.group_at_msg`,
-`im:message.p2p_msg`, `im:chat`, `contact:user.base:readonly`, plus any scopes
-used by the 41 tools in `apps/mcp-server` (calendar, base, docs, drive,
-sheets, task, mail, wiki, approval). Enable Event Subscription but leave the
-URL blank for now; you'll fill it in step (i).
+スコープには以下を追加してください:
 
-## b) Create the D1 database
+- `im:message`, `im:message.group_at_msg`, `im:message.p2p_msg`, `im:chat`, `contact:user.base:readonly`
+- `apps/mcp-server` の 49 ツール (calendar / base / docs / drive / sheets / task / mail / wiki / approval など) が使う各スコープ
+
+イベント購読は有効化しておき、Request URL は空のままにしておきます。手順 (i) で設定します。
+
+## b) D1 データベースを作成する
 
 ```bash
 cd apps/webhook
@@ -44,137 +44,136 @@ wrangler login
 wrangler d1 create lark-master
 ```
 
-Copy the returned `database_id` into `apps/webhook/wrangler.jsonc` under the
-`d1_databases` binding for `DB`. Then apply migrations:
+返ってきた `database_id` を `apps/webhook/wrangler.jsonc` の `d1_databases` バインディング
+(`DB`) に貼り付けます。その後、マイグレーションを適用します。
 
 ```bash
 wrangler d1 migrations apply lark-master --remote
 ```
 
-This runs `apps/webhook/migrations/0001_init.sql` and creates `users`,
-`tokens`, `conversations`, `messages`, `audit`.
+これにより `apps/webhook/migrations/0001_init.sql` が実行され、
+`users` / `tokens` / `conversations` / `messages` / `audit` の各テーブルが作成されます。
 
-## c) Create the KV namespace
+## c) KV ネームスペースを作成する
 
 ```bash
 wrangler kv namespace create CACHE
 ```
 
-Copy the returned `id` into `apps/webhook/wrangler.jsonc` under the
-`kv_namespaces` binding for `CACHE`.
+返ってきた `id` を `apps/webhook/wrangler.jsonc` の `kv_namespaces` バインディング (`CACHE`) に
+貼り付けます。
 
-## d) Set Worker secrets
+## d) Worker シークレットを設定する
 
-All 7 secrets go in via `wrangler secret put` (never into `wrangler.jsonc`):
+全 7 個のシークレットを `wrangler secret put` 経由で設定してください
+(`wrangler.jsonc` には絶対に書き込まないこと)。
 
 ```bash
 wrangler secret put LARK_VERIFICATION_TOKEN
-wrangler secret put LARK_ENCRYPT_KEY           # skip if not using encryption
+wrangler secret put LARK_ENCRYPT_KEY           # 暗号化を使わない場合はスキップ
 wrangler secret put LARK_APP_ID
 wrangler secret put LARK_APP_SECRET
-wrangler secret put LARK_DOMAIN                # e.g. https://open.feishu.cn or https://open.larksuite.com
-wrangler secret put ANTHROPIC_API_KEY          # forwarded to the brain
-wrangler secret put BRAIN_SHARED_SECRET        # random 32+ bytes
-# BRAIN_URL is set later in step (g)
+wrangler secret put LARK_DOMAIN                # 例: https://open.feishu.cn もしくは https://open.larksuite.com
+wrangler secret put ANTHROPIC_API_KEY          # brain コンテナに転送される
+wrangler secret put BRAIN_SHARED_SECRET        # 32 バイト以上のランダム値
+# BRAIN_URL は手順 (g) で設定します
 ```
 
-Generate `BRAIN_SHARED_SECRET` with e.g. `openssl rand -base64 48`.
+`BRAIN_SHARED_SECRET` は `openssl rand -base64 48` などで生成してください。
 
-## e) Deploy the Worker
+## e) Worker をデプロイする
 
 ```bash
 cd apps/webhook
 wrangler deploy
 ```
 
-Note the `*.workers.dev` URL. You'll need it for (i).
+払い出された `*.workers.dev` URL をメモしておきます。手順 (i) で使用します。
 
-## f) Build and deploy the brain container
+## f) Brain コンテナをビルド & デプロイする
 
-Cloudflare Containers is not yet GA at time of writing; use Fly.io as an
-interim host. The brain is a standard Node container whose Dockerfile
-installs `@larksuite/cli` globally.
+執筆時点で Cloudflare Containers は GA になっていないため、暫定ホストとして Fly.io を使います。
+brain は Node.js の標準的なコンテナで、Dockerfile 内で `@larksuite/cli` をグローバルインストール
+しています。
 
 ```bash
 cd apps/brain
-fly launch                  # creates fly.toml, do NOT deploy yet
+fly launch                  # fly.toml を作成 (まだデプロイしない)
 fly secrets set \
   ANTHROPIC_API_KEY='sk-ant-...' \
-  BRAIN_SHARED_SECRET='same-value-as-worker' \
+  BRAIN_SHARED_SECRET='Worker と同じ値' \
   LARK_DEFAULT_DOMAIN='https://open.feishu.cn' \
   LARK_CLI_BIN='lark-cli' \
   PORT='8080'
 fly deploy
 ```
 
-After deploy, capture the public URL (e.g.
-`https://lark-brain.fly.dev`) — that's your `BRAIN_URL`.
+デプロイ後、公開 URL (例: `https://lark-brain.fly.dev`) を控えておいてください。これが
+`BRAIN_URL` の値になります。
 
-When Cloudflare Containers GA arrives, replace the Fly.io steps with the
-equivalent `wrangler containers deploy` and keep the same env vars.
+Cloudflare Containers が GA になったら、上記の Fly.io 手順を `wrangler containers deploy` に
+置き換え、環境変数は同じままで運用できます。
 
-## g) Wire Worker → Brain
+## g) Worker → Brain の接続を配線する
 
 ```bash
 cd apps/webhook
-wrangler secret put BRAIN_URL     # paste https://lark-brain.fly.dev
-wrangler deploy                   # redeploy to pick up the new secret reference
+wrangler secret put BRAIN_URL     # https://lark-brain.fly.dev を貼り付け
+wrangler deploy                   # 新しいシークレット参照を反映するため再デプロイ
 ```
 
-## h) Deploy the web app
+## h) Web アプリをデプロイする
 
 ```bash
 cd apps/web
 vercel link
 vercel env add NEXT_PUBLIC_LARK_APP_ID
 vercel env add NEXT_PUBLIC_LARK_DOMAIN
-vercel env add NEXT_PUBLIC_LARK_REDIRECT_URI   # e.g. https://<worker>.workers.dev/lark/oauth/callback
+vercel env add NEXT_PUBLIC_LARK_REDIRECT_URI   # 例: https://<worker>.workers.dev/lark/oauth/callback
 vercel deploy --prod
 ```
 
-## i) Point Lark at the Worker
+## i) Lark 側に Worker URL を設定する
 
-In the Lark Developer Console for the Custom App created in (a):
+手順 (a) で作成したカスタムアプリの Lark 開発者コンソールを開きます。
 
-1. **Event Subscription** → Request URL: paste the Worker URL +
-   `/lark/event`. Click "Verify". Paste the Verification Token and Encrypt
-   Key that match (d).
-2. **Permissions** → ensure all required scopes are applied and the app is
-   released (or added to your test tenant).
-3. **Bot features** → enable the bot, add your test user as a tester.
-4. **Redirect URLs** (if using OAuth) → add the Worker's
-   `/lark/oauth/callback` URL.
+1. **Event Subscription** → Request URL に Worker URL + `/lark/event` を貼り付け、
+   「Verify」をクリック。手順 (d) で設定した Verification Token と Encrypt Key を貼り付けます。
+2. **Permissions** → 必要なスコープがすべて申請済み・承認済みになっていることを確認し、
+   アプリを公開 (またはテストテナントに追加) します。
+3. **Bot features** → Bot を有効化し、自分のテストユーザーをテスターとして追加します。
+4. **Redirect URLs** (OAuth を使う場合) → Worker の `/lark/oauth/callback` URL を追加します。
 
-## j) Smoke test
+## j) スモークテスト
 
 ```bash
-# Worker health
+# Worker の health チェック
 curl https://<worker>.workers.dev/healthz
 
-# Brain health (through the public Fly URL, Bearer header required)
+# Brain の health チェック (公開 Fly URL 経由。Bearer ヘッダが必要)
 curl -H "Authorization: Bearer $BRAIN_SHARED_SECRET" https://lark-brain.fly.dev/healthz
 
-# Real end-to-end
-# Send a direct message to your bot in Lark. Expect a reply within ~10s.
+# エンドツーエンドの実機確認
+# Lark で Bot にダイレクトメッセージを送る。約 10 秒以内に返信が返ってくるはず。
 ```
 
-Inspect logs if something is off:
+何か挙動がおかしいときはログを確認してください。
 
 ```bash
-wrangler tail --format=pretty       # Worker + DO logs
-fly logs -a lark-brain              # Brain container logs
-lark-cli auth status                # Verify lark-cli is still bot-authed
+wrangler tail --format=pretty       # Worker + DO のログ
+fly logs -a lark-brain              # Brain コンテナのログ
+lark-cli auth status                # lark-cli が Bot 認証を保持しているか確認
 ```
 
 ---
 
-## Verification
+## 検証チェックリスト
 
-- [ ] `wrangler d1 execute lark-master --remote --command "SELECT name FROM sqlite_master WHERE type='table'"` lists `users`, `tokens`, `conversations`, `messages`, `audit`.
-- [ ] `wrangler secret list` shows all 8 Worker secrets (7 from (d) plus `BRAIN_URL`).
-- [ ] `curl https://<worker>.workers.dev/healthz` returns `200`.
-- [ ] `curl -H "Authorization: Bearer $BRAIN_SHARED_SECRET" $BRAIN_URL/healthz` returns `200`.
-- [ ] Lark Developer Console "Verify" on the Event Subscription URL succeeds.
-- [ ] Sending "ping" to the bot produces an assistant reply card within 15s.
-- [ ] A new row exists in `messages` for both `role='user'` and `role='assistant'` for the ping turn.
-- [ ] `apps/web` landing page at the Vercel URL renders the "Add to Lark" button and `/connected` page loads.
+- [ ] `wrangler d1 execute lark-master --remote --command "SELECT name FROM sqlite_master WHERE type='table'"` が `users` / `tokens` / `conversations` / `messages` / `audit` を返す。
+- [ ] `wrangler secret list` で 8 個の Worker シークレットすべてが表示される (手順 (d) の 7 個 + `BRAIN_URL`)。
+- [ ] `curl https://<worker>.workers.dev/healthz` が `200` を返す。
+- [ ] `curl -H "Authorization: Bearer $BRAIN_SHARED_SECRET" $BRAIN_URL/healthz` が `200` を返す。
+- [ ] Lark 開発者コンソールで Event Subscription URL の「Verify」が成功する。
+- [ ] Bot に「ping」と送信すると 15 秒以内にアシスタントの返信カードが届く。
+- [ ] ping 応答の会話が `messages` テーブルに `role='user'` と `role='assistant'` の両方で行追加されている。
+- [ ] Vercel URL の `apps/web` ランディングページが表示され、「Add to Lark」ボタンと `/connected` ページが正しく動作する。
