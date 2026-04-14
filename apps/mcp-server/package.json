@@ -1,0 +1,51 @@
+{
+  "name": "@ivygain/lark-master-mcp",
+  "version": "0.1.0",
+  "description": "Lark Master — stdio MCP server for voiceOS / Claude Desktop / any MCP client. Powered by @larksuite/cli.",
+  "type": "module",
+  "bin": {
+    "lark-master-mcp": "./bin/lark-master-mcp.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsc -p tsconfig.json --watch",
+    "start": "node dist/index.js",
+    "inspect": "npx -y @modelcontextprotocol/inspector node dist/index.js",
+    "test": "echo 'no tests yet'"
+  },
+  "keywords": [
+    "mcp",
+    "lark",
+    "feishu",
+    "voiceos",
+    "claude",
+    "lark-cli",
+    "larksuite"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "execa": "^9.5.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IvyGain/lark-master-mcp.git",
+    "directory": "apps/mcp-server"
+  },
+  "license": "MIT"
+}

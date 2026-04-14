@@ -1,0 +1,51 @@
+/**
+ * Cloudflare Worker configuration for the Lark Master webhook.
+ *
+ * Secrets (set via `wrangler secret put <NAME>`):
+ *   - LARK_VERIFICATION_TOKEN  : from Lark Open Platform → Event Subscription
+ *   - LARK_ENCRYPT_KEY         : AES key for decrypting encrypted events (optional)
+ *   - LARK_APP_ID              : your Custom App ID (cli_xxxx)
+ *   - LARK_APP_SECRET          : your Custom App Secret
+ *   - ANTHROPIC_API_KEY        : forwarded to brain Container for Claude Agent SDK
+ *   - BRAIN_URL                : https URL of the brain Container (e.g. Fly.io app)
+ *   - BRAIN_SHARED_SECRET      : HMAC shared secret between Worker and Brain
+ */
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "lark-master-webhook",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONVERSATION",
+        "class_name": "ConversationDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ConversationDO"]
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lark-master",
+      "database_id": "PLACEHOLDER-RUN-wrangler-d1-create-lark-master",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "PLACEHOLDER-RUN-wrangler-kv-namespace-create"
+    }
+  ]
+}

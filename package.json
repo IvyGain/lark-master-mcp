@@ -1,0 +1,26 @@
+{
+  "name": "lark-master-mcp-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lark Master — voiceOS / Claude Desktop MCP server powered by @larksuite/cli",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "mcp:dev": "npm run dev --workspace apps/mcp-server",
+    "mcp:build": "npm run build --workspace apps/mcp-server",
+    "mcp:inspect": "npm run inspect --workspace apps/mcp-server"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IvyGain/lark-master-mcp.git"
+  },
+  "license": "MIT"
+}
