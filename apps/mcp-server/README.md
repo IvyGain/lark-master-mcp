@@ -64,27 +64,27 @@ Restart Claude Desktop. Lark Master tools will appear in the MCP tool list.
 
 ## Tools
 
-| Category | Tool | Description |
-|---|---|---|
-| Meta | `lark_doctor` | Health check — lark-cli binary, active profile, auth status |
-| Meta | `lark_auth_login_url` | Instructions to start `lark-cli config init --new` OAuth flow |
-| Meta | `lark_profile_list` / `lark_profile_upsert` / `lark_profile_use` | Profile management |
-| Meta | `lark_raw` | Escape hatch — call any `lark-cli` subcommand |
-| Calendar | `lark_calendar_agenda` | Today's agenda for the user |
-| Calendar | `lark_calendar_list` | List calendars |
-| Calendar | `lark_calendar_events_list` | List events in a date range |
-| Calendar | `lark_calendar_event_create` | Create a new event with attendees |
-| Messaging | `lark_im_send_text` | Send plain text message |
-| Messaging | `lark_im_send_card` | Send interactive card message |
-| Messaging | `lark_im_list_chats` | List chats visible to the identity |
-| Messaging | `lark_im_invite_bot_to_chat` | Invite a Bot app into an existing chat |
-| Docs | `lark_docs_create` | Create a new Docx document |
-| Docs | `lark_docs_get_content` | Fetch Docx blocks |
-| Base | `lark_base_create_app` | Create a new Base (Bitable) app |
-| Base | `lark_base_add_record` | Append a record to a table |
-| Base | `lark_base_list_records` | List records from a table |
-| Drive | `lark_drive_list_files` | List files in a folder |
-| Contact | `lark_contact_search_user` | Search users by name / email |
+**49 tools across 17 Lark domains.** Full list:
+
+| Domain | Count | Tools |
+|---|---:|---|
+| Meta | 6 | `lark_doctor`, `lark_raw`, `lark_auth_login_url`, `lark_profile_list` / `upsert` / `use` |
+| Calendar | 4 | `lark_calendar_agenda`, `lark_calendar_list`, `lark_calendar_events_list`, `lark_calendar_event_create` |
+| Messaging | 4 | `lark_im_send_text`, `lark_im_send_card`, `lark_im_list_chats`, `lark_im_invite_bot_to_chat` |
+| Docs | 2 | `lark_docs_create`, `lark_docs_get_content` |
+| Base | 3 | `lark_base_create_app`, `lark_base_add_record`, `lark_base_list_records` |
+| Drive | 1 | `lark_drive_list_files` |
+| Contact | 1 | `lark_contact_search_user` |
+| Sheets | 4 | `lark_sheets_create`, `lark_sheets_append`, `lark_sheets_read`, `lark_sheets_info` |
+| Task | 5 | `lark_task_create`, `lark_task_get_mine`, `lark_task_complete`, `lark_task_reopen`, `lark_task_comment` |
+| Mail | 4 | `lark_mail_send`, `lark_mail_triage`, `lark_mail_read_message`, `lark_mail_reply` |
+| Wiki | 3 | `lark_wiki_create_node`, `lark_wiki_spaces_list`, `lark_wiki_nodes_list` |
+| Approval | 4 | `lark_approval_my_tasks`, `lark_approval_approve`, `lark_approval_reject`, `lark_approval_instance_get` |
+| Slides | 1 | `lark_slides_create` |
+| VC | 3 | `lark_vc_search_meetings`, `lark_vc_meeting_notes`, `lark_vc_recording` |
+| Minutes | 1 | `lark_minutes_search` |
+| Whiteboard | 2 | `lark_whiteboard_query`, `lark_whiteboard_update` |
+| Attendance | 1 | `lark_attendance_user_tasks_query` |
 
 Every tool accepts:
 

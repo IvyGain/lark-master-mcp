@@ -11,6 +11,11 @@ import { registerTaskTools } from './task.js';
 import { registerMailTools } from './mail.js';
 import { registerWikiTools } from './wiki.js';
 import { registerApprovalTools } from './approval.js';
+import { registerSlidesTools } from './slides.js';
+import { registerVcTools } from './vc.js';
+import { registerMinutesTools } from './minutes.js';
+import { registerWhiteboardTools } from './whiteboard.js';
+import { registerAttendanceTools } from './attendance.js';
 import { registerMetaTools } from './meta.js';
 
 export function registerAllTools(server: McpServer, cfg: RuntimeConfig): void {
@@ -25,5 +30,10 @@ export function registerAllTools(server: McpServer, cfg: RuntimeConfig): void {
   registerMailTools(server, cfg);
   registerWikiTools(server, cfg);
   registerApprovalTools(server, cfg);
+  registerSlidesTools(server, cfg);
+  registerVcTools(server, cfg);
+  registerMinutesTools(server, cfg);
+  registerWhiteboardTools(server, cfg);
+  registerAttendanceTools(server, cfg);
   registerMetaTools(server, cfg);
 }
