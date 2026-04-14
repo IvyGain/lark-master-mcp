@@ -18,60 +18,38 @@ export default function LandingPage() {
 
   return (
     <main style={wrap}>
-      <section style={hero}>
+      <section style={hero} aria-labelledby="hero-title">
         <div style={eyebrow}>LARK MASTER</div>
-        <h1 style={h1}>
-          One bot. Every Lark surface.
+        <h1 id="hero-title" style={h1}>
+          ひとつのBotで、Larkのすべてを。
           <br />
-          Driven by Claude.
+          Claudeが動かします。
         </h1>
         <p style={lead}>
-          Drop a natural-language request into the Lark Bot and it fans out to calendar,
-          docs, Base, drive, mail, and tasks — automatically. Works from your phone, your
-          desktop, or your voice agent.
+          自然言語でお願いするだけで、カレンダー、ドキュメント、Base、ドライブ、メッセージが自動で連携します。スマートフォンからもデスクトップからも、同じBotが応えます。
         </p>
 
         <div style={ctaRow}>
-          <a href={authorizeUrl} style={primaryCta}>
+          <a
+            href={authorizeUrl}
+            style={primaryCta}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             Add to Lark →
           </a>
-          <a href="#how" style={secondaryCta}>
-            How it works
+          <a href="/install" style={secondaryCta}>
+            インストール手順を見る
           </a>
         </div>
 
         <p style={fineprint}>
-          Powered by <code>@larksuite/cli</code> and the Claude Agent SDK. No developer
-          console trips after install.
+          <code>@larksuite/cli</code> と Claude Agent SDK を基盤にしています。インストール後の開発者コンソール作業は不要です。
         </p>
       </section>
 
-      <section id="how" style={section}>
-        <h2 style={h2}>How it works</h2>
-        <ol style={steps}>
-          <li>
-            <strong>Add to Lark</strong> — click the button above. Lark prompts you for
-            permissions once; you approve and you are done.
-          </li>
-          <li>
-            <strong>Chat with the bot</strong> — in any Lark chat or DM, tell the bot what
-            you want. Example: <em>"book a 30 min review with Sato tomorrow 2pm"</em>.
-          </li>
-          <li>
-            <strong>Brain plans &amp; executes</strong> — Claude decomposes the request
-            into <code>lark-cli</code> calls, confirms destructive actions via an
-            interactive card, and replies with the result.
-          </li>
-          <li>
-            <strong>Use from anywhere</strong> — the same bot works from your phone when
-            your PC is off. It also ships as a stdio MCP server so voiceOS and Claude
-            Desktop can drive Lark directly.
-          </li>
-        </ol>
-      </section>
-
-      <section style={section}>
-        <h2 style={h2}>What you can do</h2>
+      <section style={section} aria-labelledby="capabilities-title">
+        <h2 id="capabilities-title" style={h2}>できること</h2>
         <div style={grid}>
           {CAPABILITIES.map((c) => (
             <div key={c.title} style={card}>
@@ -80,6 +58,24 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section id="how" style={section} aria-labelledby="how-title">
+        <h2 id="how-title" style={h2}>使い方の流れ</h2>
+        <ol style={steps}>
+          <li>
+            <strong>Add to Lark を押す</strong> — 上のボタンからLarkに追加します。権限確認は1回だけで完了します。
+          </li>
+          <li>
+            <strong>Botに話しかける</strong> — Larkの任意のチャットで「明日14時に佐藤さんと30分レビューを入れて」のように伝えます。
+          </li>
+          <li>
+            <strong>Claudeが計画して実行</strong> — リクエストを<code>lark-cli</code>呼び出しに分解し、破壊的操作はカードで確認してから実行します。
+          </li>
+          <li>
+            <strong>どこからでも使える</strong> — PCがオフでもスマートフォンから操作できます。stdio MCPサーバーとしても動作するため、音声エージェントやClaude DesktopからもLarkを操作できます。
+          </li>
+        </ol>
       </section>
 
       <footer style={footer}>
@@ -94,33 +90,34 @@ export default function LandingPage() {
 
 const CAPABILITIES = [
   {
-    title: '📅 Calendar',
+    title: 'カレンダー',
     body:
-      '"What is on my schedule today?" "Move my 3pm to Thursday." "Book a 30 min review."',
+      '「今日の予定は？」「15時の会議を木曜に移動して」「30分のレビューを予約して」',
   },
   {
-    title: '💬 Messaging',
+    title: 'メッセージ',
     body:
-      '"Send the release notes to the #ship channel." "Remind @sato about the deck."',
+      '「リリースノートを #ship チャンネルに送って」「佐藤さんに資料のリマインドを」',
   },
   {
-    title: '📄 Docs',
-    body: '"Create a design doc titled Q2 Planning and paste these bullet points."',
+    title: 'ドキュメント',
+    body:
+      '「Q2計画という設計ドキュメントを作成して、この箇条書きを貼り付けて」',
   },
   {
-    title: '📊 Base (Bitable)',
+    title: 'Base（Bitable）',
     body:
-      '"Add a bug row to the Issues base." "Show me all P0 rows opened this week."',
+      '「Issues Baseにバグ行を追加して」「今週作成されたP0の行を全部見せて」',
   },
   {
-    title: '🤖 Bot management',
+    title: 'Bot運用',
     body:
-      '"Invite the Lark Master bot to this group." "Grant admin read on the project space."',
+      '「このグループにLark Master Botを招待して」「プロジェクト空間に管理者読み取り権限を付与して」',
   },
   {
-    title: '🗂 Drive / Wiki',
+    title: 'ドライブ / Wiki',
     body:
-      '"List files in the Shared folder." "Create a wiki node under Engineering for the RFC."',
+      '「共有フォルダのファイル一覧を見せて」「EngineeringのRFC下にWikiノードを作って」',
   },
 ];
 
@@ -137,16 +134,16 @@ const eyebrow: React.CSSProperties = {
   fontWeight: 600,
 };
 const h1: React.CSSProperties = {
-  fontSize: 52,
-  lineHeight: 1.08,
+  fontSize: 48,
+  lineHeight: 1.15,
   margin: '12px 0 24px',
   fontWeight: 700,
-  letterSpacing: -1.5,
+  letterSpacing: -1.2,
 };
 const h2: React.CSSProperties = { fontSize: 28, margin: '0 0 20px', fontWeight: 700 };
 const lead: React.CSSProperties = {
-  fontSize: 20,
-  lineHeight: 1.55,
+  fontSize: 19,
+  lineHeight: 1.7,
   color: '#3d3d3d',
   maxWidth: 680,
 };
@@ -184,7 +181,7 @@ const fineprint: React.CSSProperties = {
 };
 const section: React.CSSProperties = { marginBottom: 64 };
 const steps: React.CSSProperties = {
-  lineHeight: 1.8,
+  lineHeight: 1.9,
   fontSize: 17,
   color: '#3d3d3d',
   paddingLeft: 20,
@@ -208,7 +205,7 @@ const cardTitle: React.CSSProperties = {
 const cardBody: React.CSSProperties = {
   fontSize: 14,
   color: '#6a6a6a',
-  lineHeight: 1.6,
+  lineHeight: 1.7,
 };
 const footer: React.CSSProperties = {
   display: 'flex',

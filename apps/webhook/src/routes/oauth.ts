@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../env.ts';
+import { sendCard } from '../lark/api.ts';
+import { connectedCard } from '../cards/welcome.ts';
 
 type Bindings = { Bindings: Env };
 
@@ -111,6 +113,20 @@ oauth.get('/lark/oauth/callback', async (c) => {
       )
       .run();
 
+    // Best-effort: push a "接続完了" card back to the user's private chat so
+    // they can see confirmation inside the Lark app without returning here.
+    try {
+      await sendCard(
+        c.env,
+        d.open_id,
+        connectedCard(d.name ?? ''),
+        'open_id',
+      );
+    } catch (pushErr) {
+      console.error('[oauth] connected card push failed', pushErr);
+      // Do not fail the whole callback — the user still sees the HTML success page.
+    }
+
     return c.html(renderSuccessPage(d.name ?? d.open_id, state));
   } catch (err) {
     console.error('[oauth] callback failed', err);
@@ -127,8 +143,8 @@ function renderSuccessPage(name: string, state: string | undefined): string {
 </head>
 <body>
 <h1>🎉 Connected</h1>
-<p class="ok">Welcome, <strong>${escapeHtml(name)}</strong>. Lark Master is ready.</p>
-<p>You can close this tab and head back to the Lark app. The bot will now respond on your behalf.</p>
+<p class="ok">ようこそ、<strong>${escapeHtml(name)}</strong> さん。Lark Master の準備が整いました。</p>
+<p>Lark アプリに「接続完了」カードが届きました。Lark に戻って試してみてください。</p>
 ${state ? `<p style="color:#666;font-size:13px">state=${escapeHtml(state)}</p>` : ''}
 </body></html>`;
 }
