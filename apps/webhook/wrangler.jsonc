@@ -38,14 +38,14 @@
     {
       "binding": "DB",
       "database_name": "lark-master",
-      "database_id": "PLACEHOLDER-RUN-wrangler-d1-create-lark-master",
+      "database_id": "3866316f-f32e-45b8-92f5-78a257d122df",
       "migrations_dir": "migrations"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "CACHE",
-      "id": "PLACEHOLDER-RUN-wrangler-kv-namespace-create"
+      "id": "6e46279dee754be2b335a42afe8c2467"
     }
   ]
 }

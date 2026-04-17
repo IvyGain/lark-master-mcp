@@ -1,10 +1,19 @@
-export default function ConnectedPage() {
+interface PageProps {
+  searchParams?: Promise<{ name?: string; state?: string }>;
+}
+
+export default async function ConnectedPage({ searchParams }: PageProps) {
+  const params = (await searchParams) ?? {};
+  const name = typeof params.name === 'string' ? params.name : '';
+
   return (
     <main style={wrap}>
       <div style={eyebrow}>LARK MASTER</div>
-      <h1 style={h1}>接続が完了しました</h1>
+      <h1 style={h1}>
+        {name ? `${name} さん、接続完了です` : '接続が完了しました'}
+      </h1>
       <p style={lead}>
-        認証完了。Lark アプリに戻ると「接続完了」カードが Bot から届いています。
+        認証が完了しました。Lark アプリに戻ると Bot から「接続完了」カードが届いています。
         このタブは閉じていただいて構いません。
       </p>
 

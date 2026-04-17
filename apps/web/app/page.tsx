@@ -1,20 +1,13 @@
 const APP_ID = process.env.NEXT_PUBLIC_LARK_APP_ID ?? 'cli_xxxxxxxxxxxxxxxx';
-const DOMAIN = process.env.NEXT_PUBLIC_LARK_DOMAIN ?? 'https://open.larksuite.com';
-const REDIRECT_URI =
-  process.env.NEXT_PUBLIC_LARK_REDIRECT_URI ??
-  'https://lark-master.example.com/lark/oauth/callback';
-const DEFAULT_SCOPES =
-  'im:message calendar:calendar calendar:calendar_event docx:document bitable:app bitable:record drive:drive contact:user.id:readonly contact:user.base:readonly';
+const APPLINK_HOST =
+  process.env.NEXT_PUBLIC_LARK_APPLINK_HOST ?? 'https://applink.larksuite.com';
 
 export default function LandingPage() {
-  const authorizeUrl =
-    `${DOMAIN}/open-apis/authen/v1/index?` +
-    new URLSearchParams({
-      app_id: APP_ID,
-      redirect_uri: REDIRECT_URI,
-      scope: DEFAULT_SCOPES,
-      state: 'landing',
-    }).toString();
+  // Applink opens the Lark client directly and shows the "Add to workspace"
+  // dialog for the published app. After the user taps Add, the bot joins
+  // their private chat and sends the welcome card (handled by the Worker's
+  // p2p_chat_create_v1 listener), which carries the OAuth authorize button.
+  const applinkUrl = `${APPLINK_HOST}/client/app/open?appId=${encodeURIComponent(APP_ID)}`;
 
   return (
     <main style={wrap}>
@@ -31,7 +24,7 @@ export default function LandingPage() {
 
         <div style={ctaRow}>
           <a
-            href={authorizeUrl}
+            href={applinkUrl}
             style={primaryCta}
             target="_blank"
             rel="noopener noreferrer"
