@@ -1,0 +1,31 @@
+name = "lark-master-webhook"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+node_compat = true
+
+# Production worker
+[env.production]
+workers_dev = false
+
+# Development worker
+[env.development]
+workers_dev = true
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "CONVERSATION_DO"
+class_name = "ConversationDO"
+script_name = "lark-master-webhook"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "lark-master"
+database_id = "YOUR_D1_DATABASE_ID"  # Replace with actual ID after: wrangler d1 create lark-master
+
+# Secrets (set with: wrangler secret put <NAME>)
+# - LARK_APP_ID
+# - LARK_APP_SECRET
+# - LARK_VERIFICATION_TOKEN
+# - LARK_ENCRYPT_KEY
+# - BRAIN_URL
