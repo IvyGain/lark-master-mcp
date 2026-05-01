@@ -34,12 +34,15 @@ interface CachedTenantToken {
  * 60 second safety margin.
  */
 export async function getTenantAccessToken(env: Env): Promise<string> {
+  console.log('[api] Getting tenant access token...');
   const cached = await env.CACHE.get<CachedTenantToken>(TENANT_TOKEN_KV_KEY, 'json');
   const now = Math.floor(Date.now() / 1000);
   if (cached && cached.expires_at - 60 > now) {
+    console.log('[api] Using cached token');
     return cached.token;
   }
 
+  console.log('[api] Fetching new token from Lark API...');
   const domain = env.LARK_DOMAIN || 'https://open.larksuite.com';
   const resp = await fetch(`${domain}/open-apis/auth/v3/tenant_access_token/internal`, {
     method: 'POST',
@@ -51,10 +54,13 @@ export async function getTenantAccessToken(env: Env): Promise<string> {
   });
 
   const data = (await resp.json()) as TenantTokenResponse;
+  console.log('[api] Token response code:', data.code);
   if (data.code !== 0 || !data.tenant_access_token) {
+    console.error('[api] ❌ Token acquisition failed:', data);
     throw new Error(`tenant_access_token failed: code=${data.code} msg=${data.msg}`);
   }
 
+  console.log('[api] ✅ Token acquired successfully');
   const ttl = Number(data.expire ?? 7200);
   const next: CachedTenantToken = {
     token: data.tenant_access_token,
@@ -90,11 +96,17 @@ export async function sendMessage(
   env: Env,
   input: SendMessageInput,
 ): Promise<SendMessageResult> {
+  console.log('[api] sendMessage called:', {
+    receive_id: input.receive_id,
+    receive_id_type: input.receive_id_type,
+    msg_type: input.msg_type,
+  });
   const token = await getTenantAccessToken(env);
   const domain = env.LARK_DOMAIN || 'https://open.larksuite.com';
   const url = new URL(`${domain}/open-apis/im/v1/messages`);
   url.searchParams.set('receive_id_type', input.receive_id_type);
 
+  console.log('[api] Sending message to:', url.toString());
   const resp = await fetch(url.toString(), {
     method: 'POST',
     headers: {
@@ -113,6 +125,12 @@ export async function sendMessage(
     msg?: string;
     data?: { message_id?: string };
   };
+  console.log('[api] Message response:', {
+    ok: data.code === 0,
+    code: data.code,
+    msg: data.msg,
+    message_id: data.data?.message_id,
+  });
   return {
     ok: data.code === 0,
     code: data.code,

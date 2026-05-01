@@ -11,17 +11,21 @@ workers_dev = false
 [env.development]
 workers_dev = true
 
+# KV Namespace for caching
+[[kv_namespaces]]
+binding = "CACHE"
+id = "preview_id"
+preview_id = "preview_id"
+
 # Durable Objects
 [[durable_objects.bindings]]
-name = "CONVERSATION_DO"
+name = "CONVERSATION"
 class_name = "ConversationDO"
-script_name = "lark-master-webhook"
 
-# D1 Database
-[[d1_databases]]
-binding = "DB"
-database_name = "lark-master"
-database_id = "YOUR_D1_DATABASE_ID"  # Replace with actual ID after: wrangler d1 create lark-master
+# Migrations (for Durable Objects)
+[[migrations]]
+tag = "v1"
+new_classes = ["ConversationDO"]
 
 # Secrets (set with: wrangler secret put <NAME>)
 # - LARK_APP_ID

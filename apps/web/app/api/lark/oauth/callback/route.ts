@@ -67,7 +67,7 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   try {
-    // 1) app_access_token
+    // 1) app_access_token (needed to exchange authorization code for user_access_token)
     const appTokenRes = await fetch(`${LARK_DOMAIN}/open-apis/auth/v3/app_access_token/internal`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -78,7 +78,23 @@ export async function GET(req: Request): Promise<Response> {
       throw new Error(`app_access_token failed: ${appTokenJson.msg ?? 'unknown'}`);
     }
 
-    // 2) user_access_token
+    // 2) tenant_access_token (needed to send bot messages)
+    //    IMPORTANT: Use tenant_access_token, not app_access_token, to send messages as the Bot
+    const tenantTokenRes = await fetch(`${LARK_DOMAIN}/open-apis/auth/v3/tenant_access_token/internal`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ app_id: LARK_APP_ID, app_secret: LARK_APP_SECRET }),
+    });
+    const tenantTokenJson = (await tenantTokenRes.json()) as {
+      code: number;
+      tenant_access_token?: string;
+      msg?: string;
+    };
+    if (tenantTokenJson.code !== 0 || !tenantTokenJson.tenant_access_token) {
+      throw new Error(`tenant_access_token failed: ${tenantTokenJson.msg ?? 'unknown'}`);
+    }
+
+    // 3) user_access_token
     const userRes = await fetch(`${LARK_DOMAIN}/open-apis/authen/v1/access_token`, {
       method: 'POST',
       headers: {
@@ -92,7 +108,51 @@ export async function GET(req: Request): Promise<Response> {
       throw new Error(`user_access_token failed: ${userJson.msg ?? 'unknown'}`);
     }
 
-    // 3) Redirect the browser to /connected with the name and state as
+    // 3) Multi-tenant support: Store tenant information
+    //    This enables the same app to work across different organizations
+    const openId = userJson.data.open_id;
+    const userName = userJson.data.name ?? '';
+    const tenantKey = userJson.data.tenant_key ?? '';
+    const unionId = userJson.data.union_id ?? '';
+
+    // Log tenant information for multi-tenant tracking
+    console.log('[oauth callback] User authenticated:', {
+      openId,
+      userName,
+      tenantKey, // Organization identifier
+      unionId,   // Cross-organization user identifier
+      timestamp: new Date().toISOString(),
+    });
+
+    // TODO: Store user tokens in database with tenant_key for multi-tenant support
+    // Example structure:
+    // {
+    //   tenant_key: tenantKey,
+    //   open_id: openId,
+    //   union_id: unionId,
+    //   access_token: userJson.data.access_token,
+    //   refresh_token: userJson.data.refresh_token,
+    //   expires_at: Date.now() + userJson.data.expires_in * 1000,
+    //   created_at: Date.now(),
+    // }
+
+    // 4) Send "Connected" message to user via Bot
+    //    This notifies the user that OAuth succeeded and bot is ready to use
+    //    IMPORTANT: Use tenant_access_token to send bot messages
+    try {
+      // Send a simple text message first to test token and connectivity
+      await sendSimpleTextMessage(
+        LARK_DOMAIN,
+        tenantTokenJson.tenant_access_token,
+        openId,
+        `${userName ? `${userName} さん、` : ''}ようこそ Lark Master へ 🎉\n\n権限の承認ありがとうございます。このチャットで「help」と送信すると使い方が表示されます。`
+      );
+    } catch (cardErr) {
+      // Non-fatal: even if card sending fails, OAuth succeeded
+      console.warn('[oauth callback] failed to send message:', cardErr);
+    }
+
+    // 5) Redirect the browser to /connected with the name and state as
     //    query params (not the token — never send tokens via URL).
     const target = new URL('/connected', url.origin);
     if (userJson.data.name) target.searchParams.set('name', userJson.data.name);
@@ -104,6 +164,132 @@ export async function GET(req: Request): Promise<Response> {
       status: 500,
       headers: { 'content-type': 'text/html; charset=utf-8' },
     });
+  }
+}
+
+/**
+ * Send a simple text message to user via Lark Bot
+ * IMPORTANT: This uses tenant_access_token (not app_access_token) to send bot messages
+ */
+async function sendSimpleTextMessage(
+  domain: string,
+  tenantAccessToken: string,
+  openId: string,
+  text: string
+): Promise<void> {
+  const res = await fetch(`${domain}/open-apis/im/v1/messages?receive_id_type=open_id`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${tenantAccessToken}`,
+    },
+    body: JSON.stringify({
+      receive_id: openId,
+      msg_type: 'text',
+      content: JSON.stringify({ text }),
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Send text failed: ${res.status} ${errorText}`);
+  }
+
+  const json = await res.json();
+  if (json.code !== 0) {
+    throw new Error(`Send text API error: ${json.msg ?? 'unknown'}`);
+  }
+}
+
+/**
+ * Send "Connected" card to user via Lark Bot
+ * IMPORTANT: This uses tenant_access_token (not app_access_token) to send bot messages
+ */
+async function sendConnectedCard(
+  domain: string,
+  tenantAccessToken: string,
+  openId: string,
+  userName: string
+): Promise<void> {
+  const card = {
+    schema: '2.0',
+    config: { wide_screen_mode: true },
+    header: {
+      template: 'green',
+      title: {
+        tag: 'plain_text',
+        content: '✅ 接続が完了しました',
+      },
+    },
+    elements: [
+      {
+        tag: 'div',
+        text: {
+          tag: 'lark_md',
+          content:
+            `${userName ? `**${userName}** さん、` : ''}ようこそ Lark Master へ 🎉\n\n` +
+            '以下のように話しかけてみてください:',
+        },
+      },
+      {
+        tag: 'div',
+        fields: [
+          {
+            is_short: false,
+            text: {
+              tag: 'lark_md',
+              content: '**📅 カレンダー**\n> 「今日の予定を教えて」',
+            },
+          },
+          {
+            is_short: false,
+            text: {
+              tag: 'lark_md',
+              content: '**📄 ドキュメント**\n> 「議事録のドキュメントを作って」',
+            },
+          },
+          {
+            is_short: false,
+            text: {
+              tag: 'lark_md',
+              content: '**💬 メッセージ**\n> 「#general にデプロイ完了と送って」',
+            },
+          },
+        ],
+      },
+      {
+        tag: 'note',
+        elements: [
+          {
+            tag: 'plain_text',
+            content: '💡 このチャットで自然言語で指示するだけで、Larkのあらゆる操作が可能です。',
+          },
+        ],
+      },
+    ],
+  };
+
+  const res = await fetch(`${domain}/open-apis/im/v1/messages?receive_id_type=open_id`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${tenantAccessToken}`,
+    },
+    body: JSON.stringify({
+      receive_id: openId,
+      msg_type: 'interactive',
+      content: JSON.stringify(card),
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Send card failed: ${res.status} ${errorText}`);
+  }
+
+  const json = await res.json();
+  if (json.code !== 0) {
+    throw new Error(`Send card API error: ${json.msg ?? 'unknown'}`);
   }
 }
 

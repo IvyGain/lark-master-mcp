@@ -1,13 +1,53 @@
+/**
+ * Improved landing page with "Login with Lark" button
+ *
+ * This approach combines OAuth authorization and bot installation in ONE STEP:
+ * - User clicks "Login with Lark"
+ * - OAuth consent screen shows BOTH user permissions AND bot installation
+ * - After approval, bot is automatically added to user's workspace
+ * - No need for separate Applink flow
+ */
+
 const APP_ID = process.env.NEXT_PUBLIC_LARK_APP_ID ?? 'cli_xxxxxxxxxxxxxxxx';
-const APPLINK_HOST =
-  process.env.NEXT_PUBLIC_LARK_APPLINK_HOST ?? 'https://applink.larksuite.com';
+const LARK_DOMAIN = process.env.NEXT_PUBLIC_LARK_DOMAIN ?? 'https://open.larksuite.com';
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL ?? 'http://localhost:4000';
+
+// OAuth scopes that include bot permissions
+// IMPORTANT: These must match EXACTLY what is registered in Lark Developer Console
+const SCOPES = [
+  'im:message',
+  'im:message.group_msg:get_as_user',
+  'im:message.p2p_msg:get_as_user',
+  'im:message:readonly',
+  'im:chat',
+  'im:chat:readonly',
+  'calendar:calendar',
+  'calendar:calendar.event:create',
+  'calendar:calendar.event:read',
+  'docx:document',
+  'bitable:app',
+  'drive:drive',
+  'contact:user.id:readonly',
+  'contact:user.base:readonly',
+  'contact:user.employee_id:readonly',
+  'offline_access',
+];
+
+/**
+ * Build OAuth authorize URL with bot installation
+ * When user approves, BOTH user permissions and bot are granted simultaneously
+ */
+function buildLoginUrl(): string {
+  const url = new URL(`${LARK_DOMAIN}/open-apis/authen/v1/index`);
+  url.searchParams.set('app_id', APP_ID);
+  url.searchParams.set('redirect_uri', `${WEB_URL}/api/lark/oauth/callback`);
+  url.searchParams.set('scope', SCOPES.join(' '));
+  url.searchParams.set('state', 'login_from_web');
+  return url.toString();
+}
 
 export default function LandingPage() {
-  // Applink opens the Lark client directly and shows the "Add to workspace"
-  // dialog for the published app. After the user taps Add, the bot joins
-  // their private chat and sends the welcome card (handled by the Worker's
-  // p2p_chat_create_v1 listener), which carries the OAuth authorize button.
-  const applinkUrl = `${APPLINK_HOST}/client/app/open?appId=${encodeURIComponent(APP_ID)}`;
+  const loginUrl = buildLoginUrl();
 
   return (
     <main style={wrap}>
@@ -23,13 +63,13 @@ export default function LandingPage() {
         </p>
 
         <div style={ctaRow}>
+          {/* 改善版：直接OAuthログインへ */}
           <a
-            href={applinkUrl}
+            href={loginUrl}
             style={primaryCta}
-            target="_blank"
             rel="noopener noreferrer"
           >
-            Add to Lark →
+            🚀 Larkでログイン →
           </a>
           <a href="/install" style={secondaryCta}>
             インストール手順を見る
@@ -37,7 +77,9 @@ export default function LandingPage() {
         </div>
 
         <p style={fineprint}>
-          <code>@larksuite/cli</code> と Claude Agent SDK を基盤にしています。インストール後の開発者コンソール作業は不要です。
+          ワンクリックで連携完了。Bot追加と権限承認が同時に行われます。
+          <br />
+          <code>@larksuite/cli</code> と Claude Agent SDK を基盤にしています。
         </p>
       </section>
 
@@ -57,7 +99,7 @@ export default function LandingPage() {
         <h2 id="how-title" style={h2}>使い方の流れ</h2>
         <ol style={steps}>
           <li>
-            <strong>Add to Lark を押す</strong> — 上のボタンからLarkに追加します。権限確認は1回だけで完了します。
+            <strong>Larkでログイン を押す</strong> — 上のボタンから認証します。Bot追加と権限承認が同時に完了します。
           </li>
           <li>
             <strong>Botに話しかける</strong> — Larkの任意のチャットで「明日14時に佐藤さんと30分レビューを入れて」のように伝えます。
@@ -134,6 +176,7 @@ const h1: React.CSSProperties = {
   letterSpacing: -1.2,
 };
 const h2: React.CSSProperties = { fontSize: 28, margin: '0 0 20px', fontWeight: 700 };
+const h3: React.CSSProperties = { fontSize: 24, margin: '0 0 16px', fontWeight: 700, textAlign: 'center' as const };
 const lead: React.CSSProperties = {
   fontSize: 19,
   lineHeight: 1.7,
@@ -173,6 +216,15 @@ const fineprint: React.CSSProperties = {
   fontSize: 14,
 };
 const section: React.CSSProperties = { marginBottom: 64 };
+const benefitsSection: React.CSSProperties = {
+  marginBottom: 64,
+  padding: '32px 0',
+  background: '#faf9f5',
+  marginLeft: -24,
+  marginRight: -24,
+  paddingLeft: 24,
+  paddingRight: 24,
+};
 const steps: React.CSSProperties = {
   lineHeight: 1.9,
   fontSize: 17,
@@ -183,6 +235,36 @@ const grid: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
   gap: 16,
+};
+const comparisonGrid: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+  gap: 24,
+  maxWidth: 800,
+  margin: '0 auto',
+};
+const comparisonCard: React.CSSProperties = {
+  background: '#fff',
+  border: '2px solid #e8e6dc',
+  borderRadius: 12,
+  padding: 24,
+};
+const cardBadge = (type: 'old' | 'new'): React.CSSProperties => ({
+  display: 'inline-block',
+  padding: '4px 12px',
+  borderRadius: 6,
+  fontSize: 13,
+  fontWeight: 700,
+  marginBottom: 16,
+  background: type === 'new' ? '#d4edda' : '#f8d7da',
+  color: type === 'new' ? '#155724' : '#721c24',
+});
+const stepsList: React.CSSProperties = {
+  paddingLeft: 20,
+  margin: 0,
+  lineHeight: 2,
+  fontSize: 15,
+  color: '#3d3d3d',
 };
 const card: React.CSSProperties = {
   background: '#fff',

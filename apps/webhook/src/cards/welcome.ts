@@ -243,6 +243,21 @@ export function helpCard(): Record<string, unknown> {
         ],
       },
       {
+        tag: 'hr',
+      },
+      {
+        tag: 'div',
+        text: {
+          tag: 'lark_md',
+          content:
+            '**コマンド一覧**\n' +
+            '- `help` または `/help` — この使い方カードを表示\n' +
+            '- `setup` または `/setup` — 管理者向けセットアップガイド\n' +
+            '- `ping` — 接続確認\n' +
+            '- `/try` — サンプル例文を表示',
+        },
+      },
+      {
         tag: 'note',
         elements: [
           {
