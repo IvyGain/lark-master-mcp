@@ -9,19 +9,31 @@ export function registerMinutesTools(server: McpServer, cfg: RuntimeConfig): voi
     'Search minutes by keyword / owners / participants / time range. Wraps `lark-cli minutes +search`.',
     {
       ...commonFlagsSchema,
-      query: z.string().optional(),
-      owners: z.array(z.string()).optional().describe('Owner open_id list'),
-      participants: z.array(z.string()).optional(),
-      start_time: z.string().optional(),
-      end_time: z.string().optional(),
+      query: z.string().optional().describe('Search keyword'),
+      owner_open_ids: z
+        .array(z.string())
+        .optional()
+        .describe('Owner open_id list (use "me" for current user)'),
+      participant_open_ids: z
+        .array(z.string())
+        .optional()
+        .describe('Participant open_id list (use "me" for current user)'),
+      start: z
+        .string()
+        .optional()
+        .describe('Time lower bound (ISO 8601 or YYYY-MM-DD)'),
+      end: z
+        .string()
+        .optional()
+        .describe('Time upper bound (ISO 8601 or YYYY-MM-DD)'),
     },
-    async ({ identity, dry_run, query, owners, participants, start_time, end_time }) => {
+    async ({ identity, dry_run, query, owner_open_ids, participant_open_ids, start, end }) => {
       const args = ['minutes', '+search'];
       if (query) args.push('--query', query);
-      if (owners?.length) args.push('--owners', owners.join(','));
-      if (participants?.length) args.push('--participants', participants.join(','));
-      if (start_time) args.push('--start-time', start_time);
-      if (end_time) args.push('--end-time', end_time);
+      if (owner_open_ids?.length) args.push('--owner-ids', owner_open_ids.join(','));
+      if (participant_open_ids?.length) args.push('--participant-ids', participant_open_ids.join(','));
+      if (start) args.push('--start', start);
+      if (end) args.push('--end', end);
       return callLarkCli({ args, identity: identity ?? 'user', dryRun: dry_run }, cfg);
     },
   );

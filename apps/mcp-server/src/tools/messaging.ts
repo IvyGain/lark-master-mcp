@@ -22,7 +22,7 @@ export function registerMessagingTools(server: McpServer, cfg: RuntimeConfig): v
     async ({ identity, dry_run, chat_id, open_id, text }) => {
       const args = ['im', '+messages-send', '--text', text];
       if (chat_id) args.push('--chat-id', chat_id);
-      if (open_id) args.push('--open-id', open_id);
+      if (open_id) args.push('--user-id', open_id);
       return callLarkCli({ args, identity, dryRun: dry_run }, cfg);
     },
   );

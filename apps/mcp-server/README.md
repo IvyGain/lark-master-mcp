@@ -1,34 +1,57 @@
 # @ivygain/lark-master-mcp
 
-> stdio MCP server that wraps [`@larksuite/cli`](https://github.com/larksuite/cli)
-> so voiceOS / Claude Desktop / Claude Code / any MCP client can drive Lark
-> (Messenger / Calendar / Docs / Base / Drive / Contact) via natural language.
+> 49 Lark/Feishu tools for Claude Desktop, VoiceOS, and any MCP client.
+> A thin, well-typed wrapper around the official [`@larksuite/cli`](https://github.com/larksuite/cli).
+
+[![npm version](https://img.shields.io/npm/v/@ivygain/lark-master-mcp.svg)](https://www.npmjs.com/package/@ivygain/lark-master-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org/)
+
+## What it does
+
+Exposes the Lark/Feishu API as 49 MCP tools across 17 domains: messaging, calendar, docs, sheets, slides, base (bitable), wiki, drive, mail, tasks, approvals, contacts, VC, minutes, attendance, whiteboard, and meta.
+
+Auth and API calls are delegated to `@larksuite/cli`, so this server stays small and inherits OAuth/token management from the official tool.
+
+---
+
+## Prerequisites
+
+1. **Node.js 20+**
+2. **lark-cli** installed globally and authenticated:
+   ```bash
+   npm install -g @larksuite/cli
+   lark-cli config init        # set App ID / App Secret of your Lark app
+   lark-cli auth login --domain all
+   ```
+   The `auth login` step opens a browser for OAuth — approve once and you're done.
+
+> **Multi-tenant note**: each user must run `lark-cli auth login` against a Lark app *they have permission to use*. The MCP server itself stores nothing; it just shells out to `lark-cli`, which manages tokens in `~/.lark-cli/`.
+
+---
 
 ## Install
 
-```bash
-# Use directly via npx (no install needed)
-npx -y @ivygain/lark-master-mcp
+### As an MCP client dependency (recommended)
 
-# Or globally
-npm install -g @ivygain/lark-master-mcp
-lark-master-mcp
+No install needed — point your MCP client at `npx`:
+
+```bash
+npx -y @ivygain/lark-master-mcp
 ```
 
-**Prerequisites**:
+### Global install
 
-- Node.js 20+
-- [`@larksuite/cli`](https://github.com/larksuite/cli) reachable on PATH
-  (the server just shells out to `lark-cli`)
-- A one-time Custom App registered in the
-  [Lark Open Platform console](https://open.larksuite.com/app) —
-  run `lark-cli config init --new` and follow the authorize URL
+```bash
+npm install -g @ivygain/lark-master-mcp
+lark-master-mcp   # runs the stdio server
+```
 
-## Configure your MCP client
+---
 
-### voiceOS
+## Use with Claude Desktop
 
-Add to your voiceOS MCP config:
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
@@ -41,86 +64,115 @@ Add to your voiceOS MCP config:
 }
 ```
 
-### Claude Desktop
+Restart Claude Desktop. You should see 49 `lark_*` tools available.
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+---
 
-```json
-{
-  "mcpServers": {
-    "lark-master": {
-      "command": "npx",
-      "args": ["-y", "@ivygain/lark-master-mcp"],
-      "env": {
-        "LARK_DOMAIN": "https://open.larksuite.com",
-        "LARK_DEFAULT_IDENTITY": "auto"
-      }
-    }
-  }
-}
+## Use with VoiceOS
+
+In VoiceOS:
+
+1. **パーソナライズ → エージェントモード → カスタム連携 → ＋追加**
+2. Fill in:
+   - **名前**: `Lark Master`
+   - **起動コマンド**: `npx -y @ivygain/lark-master-mcp`
+3. Click **接続**.
+
+That's it. VoiceOS will spawn the MCP server on demand.
+
+---
+
+## Use with Claude Code
+
+```bash
+claude mcp add lark-master -- npx -y @ivygain/lark-master-mcp
 ```
 
-Restart Claude Desktop. Lark Master tools will appear in the MCP tool list.
+---
 
-## Tools
+## Tool reference (49 tools across 17 domains)
 
-**49 tools across 17 Lark domains.** Full list:
-
-| Domain | Count | Tools |
-|---|---:|---|
-| Meta | 6 | `lark_doctor`, `lark_raw`, `lark_auth_login_url`, `lark_profile_list` / `upsert` / `use` |
-| Calendar | 4 | `lark_calendar_agenda`, `lark_calendar_list`, `lark_calendar_events_list`, `lark_calendar_event_create` |
-| Messaging | 4 | `lark_im_send_text`, `lark_im_send_card`, `lark_im_list_chats`, `lark_im_invite_bot_to_chat` |
-| Docs | 2 | `lark_docs_create`, `lark_docs_get_content` |
-| Base | 3 | `lark_base_create_app`, `lark_base_add_record`, `lark_base_list_records` |
-| Drive | 1 | `lark_drive_list_files` |
-| Contact | 1 | `lark_contact_search_user` |
-| Sheets | 4 | `lark_sheets_create`, `lark_sheets_append`, `lark_sheets_read`, `lark_sheets_info` |
-| Task | 5 | `lark_task_create`, `lark_task_get_mine`, `lark_task_complete`, `lark_task_reopen`, `lark_task_comment` |
-| Mail | 4 | `lark_mail_send`, `lark_mail_triage`, `lark_mail_read_message`, `lark_mail_reply` |
-| Wiki | 3 | `lark_wiki_create_node`, `lark_wiki_spaces_list`, `lark_wiki_nodes_list` |
-| Approval | 4 | `lark_approval_my_tasks`, `lark_approval_approve`, `lark_approval_reject`, `lark_approval_instance_get` |
-| Slides | 1 | `lark_slides_create` |
-| VC | 3 | `lark_vc_search_meetings`, `lark_vc_meeting_notes`, `lark_vc_recording` |
-| Minutes | 1 | `lark_minutes_search` |
-| Whiteboard | 2 | `lark_whiteboard_query`, `lark_whiteboard_update` |
-| Attendance | 1 | `lark_attendance_user_tasks_query` |
+| Domain      | Count | Sample tools |
+|-------------|------:|-------------|
+| Meta        | 6 | `lark_doctor`, `lark_raw`, `lark_profile_*` |
+| Messaging   | 4 | `lark_im_send_text`, `lark_im_send_card`, `lark_im_list_chats` |
+| Calendar    | 4 | `lark_calendar_agenda`, `lark_calendar_event_create` |
+| Task        | 5 | `lark_task_create` (with multi-assignee), `lark_task_get_mine` |
+| Mail        | 4 | `lark_mail_send`, `lark_mail_triage`, `lark_mail_reply` |
+| Docs        | 2 | `lark_docs_create`, `lark_docs_get_content` |
+| Sheets      | 4 | `lark_sheets_create`, `lark_sheets_append`, `lark_sheets_read` |
+| Slides      | 1 | `lark_slides_create` |
+| Base        | 3 | `lark_base_create_app`, `lark_base_add_record` |
+| Wiki        | 3 | `lark_wiki_create_node`, `lark_wiki_spaces_list` |
+| Drive       | 1 | `lark_drive_list_files` |
+| Contact     | 1 | `lark_contact_search_user` |
+| Approval    | 4 | `lark_approval_my_tasks`, `lark_approval_approve` |
+| VC          | 3 | `lark_vc_search_meetings`, `lark_vc_meeting_notes` |
+| Minutes     | 1 | `lark_minutes_search` |
+| Whiteboard  | 2 | `lark_whiteboard_query`, `lark_whiteboard_update` |
+| Attendance  | 1 | `lark_attendance_user_tasks_query` |
 
 Every tool accepts:
+- `identity`: `user` | `bot` | `auto` (maps to `lark-cli --as`)
+- `dry_run`: `true` to print the underlying lark-cli command without executing
 
-- `identity`: `user` / `bot` / `auto` — maps to `lark-cli --as`
-- `dry_run`: when `true`, lark-cli prints the request without executing
+---
 
-## Environment variables
+## Configuration
 
-| Name | Default | Description |
-|---|---|---|
-| `LARK_CLI_BIN` | `lark-cli` | Path to lark-cli binary |
-| `LARK_MASTER_PROFILE_DIR` | `~/.lark-master` | Where profiles are stored |
-| `LARK_DEFAULT_IDENTITY` | `auto` | Default `--as` value |
-| `LARK_DOMAIN` | (lark-cli default) | Lark / Feishu domain URL |
-| `LARK_MASTER_REQUIRE_CONFIRM` | `false` | Reserved for future destructive-action gating |
+The server reads no secrets directly. All auth flows through `lark-cli`. You can override the binary path or default identity via env vars:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LARK_CLI_BIN` | `lark-cli` | Path to the `lark-cli` executable |
+| `LARK_DEFAULT_IDENTITY` | `auto` | Default `--as` value (`user` / `bot` / `auto`) |
+| `LARK_DOMAIN` | (lark-cli default) | Override Lark/Feishu domain |
+| `LARK_MASTER_PROFILE_DIR` | `~/.lark-master` | Where to store profile metadata |
+
+---
+
+## Security
+
+- **No secrets in the package**: this MCP server contains no API keys, tokens, or App IDs. All credentials are managed by `lark-cli` in your home directory.
+- **Local-only by default**: stdio transport — no network listeners, no inbound traffic.
+- **Per-user OAuth**: each user authenticates against their own Lark account.
+- **Open source**: MIT licensed, source on [GitHub](https://github.com/IvyGain/lark-master-mcp).
+
+If you find a vulnerability, please open an issue at [github.com/IvyGain/lark-master-mcp/issues](https://github.com/IvyGain/lark-master-mcp/issues).
+
+---
+
+## Troubleshooting
+
+**`MCP error -32000: Connection closed`** in VoiceOS / Claude Desktop:
+1. Run `lark-cli doctor` — it should show `ok: true`. If not, fix the failing check.
+2. If `lark-cli` itself isn't installed: `npm install -g @larksuite/cli`.
+3. If not authenticated: `lark-cli auth login --domain all`.
+
+**Tool returns `(no logged-in users)`**: run `lark-cli auth login --domain all` and approve in the browser.
+
+**A tool's flag seems to be silently ignored**: please open an issue with the tool name and the input you sent. The wrapper validates inputs but `lark-cli` flag names occasionally change between versions.
+
+---
 
 ## Development
 
 ```bash
-cd apps/mcp-server
+git clone https://github.com/IvyGain/lark-master-mcp.git
+cd lark-master-mcp
 npm install
-npm run build
-npm run inspect   # opens MCP Inspector in the browser
+npm run mcp:build      # builds apps/mcp-server
+npm run mcp:dev        # watch mode
 ```
 
-## Architecture
+Test locally without publishing:
 
-```
-MCP Client  ─stdio─▶  lark-master-mcp  ─spawn─▶  lark-cli  ─HTTP─▶  Lark Open API
+```bash
+node /absolute/path/to/lark-master-mcp/apps/mcp-server/build/index.js
 ```
 
-All Lark operations are delegated to `lark-cli`. This server is a thin,
-schema-validated, zod-typed bridge — no API logic of its own. The
-[official lark-cli Agent Skills](https://github.com/larksuite/cli#agent-skills)
-provide deeper workflow knowledge when used alongside this MCP.
+---
 
 ## License
 
-MIT
+MIT — see [LICENSE](./LICENSE).

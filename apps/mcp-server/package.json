@@ -1,53 +1,65 @@
 {
   "name": "@ivygain/lark-master-mcp",
-  "version": "0.1.0",
-  "description": "Lark Master — stdio MCP server for voiceOS / Claude Desktop / any MCP client. Powered by @larksuite/cli.",
+  "version": "0.2.0",
+  "description": "Lark Master MCP — 49 Lark/Feishu tools for Claude Desktop, VoiceOS, and other MCP clients. Thin wrapper around the official @larksuite/cli.",
   "type": "module",
   "bin": {
-    "lark-master-mcp": "./bin/lark-master-mcp.js"
+    "lark-master-mcp": "./build/index.js"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./build/index.js",
   "files": [
-    "bin",
-    "dist",
-    "README.md"
+    "build/",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev": "tsc -p tsconfig.json --watch",
-    "start": "node dist/index.js",
-    "inspect": "npx -y @modelcontextprotocol/inspector node dist/index.js",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "build": "tsc && chmod +x ./build/index.js",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "lark",
     "feishu",
-    "voiceos",
     "claude",
+    "voiceos",
+    "ai",
     "lark-cli",
-    "larksuite"
+    "anthropic"
   ],
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
-    "execa": "^9.5.1",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.2",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
-  },
-  "engines": {
-    "node": ">=20"
-  },
+  "author": "IvyGain <ivygain.official@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/IvyGain/lark-master-mcp#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/IvyGain/lark-master-mcp.git",
     "directory": "apps/mcp-server"
   },
-  "license": "MIT"
+  "bugs": {
+    "url": "https://github.com/IvyGain/lark-master-mcp/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@larksuite/cli": ">=1.0.9"
+  },
+  "peerDependenciesMeta": {
+    "@larksuite/cli": {
+      "optional": false
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
 }

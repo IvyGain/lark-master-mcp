@@ -10,11 +10,16 @@ export function registerSlidesTools(server: McpServer, cfg: RuntimeConfig): void
     {
       ...commonFlagsSchema,
       title: z.string().describe('Presentation title'),
-      folder_token: z.string().optional().describe('Parent folder token'),
+      slides: z
+        .array(z.string())
+        .optional()
+        .describe('Slide content as XML strings (max 10 slides; for more pages, create first then add via xml_presentation.slide.create)'),
     },
-    async ({ identity, dry_run, title, folder_token }) => {
+    async ({ identity, dry_run, title, slides }) => {
       const args = ['slides', '+create', '--title', title];
-      if (folder_token) args.push('--folder-token', folder_token);
+      if (slides && slides.length > 0) {
+        args.push('--slides', JSON.stringify(slides));
+      }
       return callLarkCli({ args, identity, dryRun: dry_run }, cfg);
     },
   );

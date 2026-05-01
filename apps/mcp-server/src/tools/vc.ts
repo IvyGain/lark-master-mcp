@@ -9,17 +9,31 @@ export function registerVcTools(server: McpServer, cfg: RuntimeConfig): void {
     'Search video meeting records with at least one filter. Wraps `lark-cli vc +search`.',
     {
       ...commonFlagsSchema,
-      query: z.string().optional().describe('Free-text query'),
-      start_time: z.string().optional().describe('Unix seconds'),
-      end_time: z.string().optional().describe('Unix seconds'),
-      owner_open_id: z.string().optional(),
+      query: z.string().optional().describe('Search keyword'),
+      start: z
+        .string()
+        .optional()
+        .describe('Start time (ISO 8601 or YYYY-MM-DD, e.g. "2026-03-24T00:00+09:00")'),
+      end: z
+        .string()
+        .optional()
+        .describe('End time (ISO 8601 or YYYY-MM-DD, e.g. "2026-03-25")'),
+      organizer_open_ids: z
+        .array(z.string())
+        .optional()
+        .describe('Organizer open_id list'),
+      participant_open_ids: z
+        .array(z.string())
+        .optional()
+        .describe('Participant open_id list'),
     },
-    async ({ identity, dry_run, query, start_time, end_time, owner_open_id }) => {
+    async ({ identity, dry_run, query, start, end, organizer_open_ids, participant_open_ids }) => {
       const args = ['vc', '+search'];
       if (query) args.push('--query', query);
-      if (start_time) args.push('--start-time', start_time);
-      if (end_time) args.push('--end-time', end_time);
-      if (owner_open_id) args.push('--owner', owner_open_id);
+      if (start) args.push('--start', start);
+      if (end) args.push('--end', end);
+      if (organizer_open_ids?.length) args.push('--organizer-ids', organizer_open_ids.join(','));
+      if (participant_open_ids?.length) args.push('--participant-ids', participant_open_ids.join(','));
       return callLarkCli({ args, identity: identity ?? 'user', dryRun: dry_run }, cfg);
     },
   );

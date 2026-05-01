@@ -39,19 +39,24 @@ export function registerSheetsTools(server: McpServer, cfg: RuntimeConfig): void
     {
       ...commonFlagsSchema,
       spreadsheet_token: z.string().describe('Spreadsheet token (shtcn...)'),
-      sheet_id: z.string().optional().describe('Target sheet id. Defaults to the first sheet.'),
-      rows: z
+      sheet_id: z.string().optional().describe('Target sheet id. Defaults to the first sheet (used together with --range).'),
+      range: z
+        .string()
+        .describe('Append range. Forms: "<sheetId>!A1:D10", "A1:D10" (with sheet_id), or single cell like "C2"'),
+      values: z
         .array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])))
-        .describe('Rows to append, as a 2D array of cell values'),
+        .describe('2D array of cell values to append'),
     },
-    async ({ identity, dry_run, spreadsheet_token, sheet_id, rows }) => {
+    async ({ identity, dry_run, spreadsheet_token, sheet_id, range, values }) => {
       const args = [
         'sheets',
         '+append',
         '--spreadsheet-token',
         spreadsheet_token,
-        '--rows',
-        JSON.stringify(rows),
+        '--range',
+        range,
+        '--values',
+        JSON.stringify(values),
       ];
       if (sheet_id) args.push('--sheet-id', sheet_id);
       return callLarkCli({ args, identity, dryRun: dry_run }, cfg);

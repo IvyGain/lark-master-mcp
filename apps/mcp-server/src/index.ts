@@ -1,10 +1,11 @@
+#!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadConfig } from './config.js';
 import { registerAllTools } from './tools/index.js';
 
 const PACKAGE_NAME = '@ivygain/lark-master-mcp';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.2.0';
 
 async function main(): Promise<void> {
   const cfg = loadConfig();

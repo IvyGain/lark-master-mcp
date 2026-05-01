@@ -9,41 +9,61 @@ export function registerWhiteboardTools(server: McpServer, cfg: RuntimeConfig): 
     'Query an existing whiteboard and export preview image or raw nodes. Wraps `lark-cli whiteboard +query`.',
     {
       ...commonFlagsSchema,
-      whiteboard_id: z.string().describe('Whiteboard id / token'),
-      format: z.enum(['image', 'nodes']).optional().default('nodes'),
+      whiteboard_token: z.string().describe('Whiteboard token (read permission required for image export)'),
+      output_as: z.enum(['image', 'code', 'raw']).optional().default('raw').describe('Output format'),
+      output: z.string().optional().describe('Output directory (required when output_as=image)'),
+      overwrite: z.boolean().optional().describe('Overwrite existing output file'),
     },
-    async ({ identity, dry_run, whiteboard_id, format }) => {
-      const args = ['whiteboard', '+query', '--whiteboard-id', whiteboard_id, '--format', format];
+    async ({ identity, dry_run, whiteboard_token, output_as, output, overwrite }) => {
+      const args = [
+        'whiteboard',
+        '+query',
+        '--whiteboard-token',
+        whiteboard_token,
+        '--output_as',
+        output_as,
+      ];
+      if (output) args.push('--output', output);
+      if (overwrite) args.push('--overwrite');
       return callLarkCli({ args, identity, dryRun: dry_run }, cfg);
     },
   );
 
   server.tool(
     'lark_whiteboard_update',
-    'Update an existing whiteboard with mermaid / plantuml / whiteboard DSL. Wraps `lark-cli whiteboard +update`.',
+    'Update an existing whiteboard with mermaid / plantuml / raw whiteboard DSL. Wraps `lark-cli whiteboard +update`.',
     {
       ...commonFlagsSchema,
-      whiteboard_id: z.string(),
-      dsl_type: z.enum(['mermaid', 'plantuml', 'whiteboard']).describe('DSL language of the body'),
-      body: z.string().describe('DSL source to render into the whiteboard'),
+      whiteboard_token: z.string().describe('Whiteboard token (edit permission required)'),
+      input_format: z
+        .enum(['raw', 'mermaid', 'plantuml'])
+        .default('raw')
+        .describe('Input DSL format'),
+      source: z.string().describe('DSL source to render into the whiteboard'),
+      overwrite: z
+        .boolean()
+        .optional()
+        .describe('Overwrite — delete all existing content before update'),
+      idempotent_token: z
+        .string()
+        .optional()
+        .describe('Idempotent token (min length 10)'),
     },
-    async ({ identity, dry_run, whiteboard_id, dsl_type, body }) =>
-      callLarkCli(
-        {
-          args: [
-            'whiteboard',
-            '+update',
-            '--whiteboard-id',
-            whiteboard_id,
-            '--dsl-type',
-            dsl_type,
-            '--body',
-            body,
-          ],
-          identity,
-          dryRun: dry_run,
-        },
-        cfg,
-      ),
+    async ({ identity, dry_run, whiteboard_token, input_format, source, overwrite, idempotent_token }) => {
+      const args = [
+        'whiteboard',
+        '+update',
+        '--whiteboard-token',
+        whiteboard_token,
+        '--input_format',
+        input_format,
+        '--source',
+        source,
+        '--yes',
+      ];
+      if (overwrite) args.push('--overwrite');
+      if (idempotent_token) args.push('--idempotent-token', idempotent_token);
+      return callLarkCli({ args, identity, dryRun: dry_run }, cfg);
+    },
   );
 }

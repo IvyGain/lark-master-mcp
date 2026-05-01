@@ -15,12 +15,23 @@ out/
 .env
 .env.local
 .env.*.local
+.dev.vars
+.dev.vars.*
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Other AI assistants' local config
+.kiro/
+.trae/
+.windsurf/
+.cursor/
+
+# Wrangler local cache
+.wrangler/
 
 # OS files
 .DS_Store
