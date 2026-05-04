@@ -1,6 +1,6 @@
 {
   "name": "@ivygain/lark-master-mcp",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Lark Master MCP — 49 Lark/Feishu tools for Claude Desktop, VoiceOS, and other MCP clients. Thin wrapper around the official @larksuite/cli.",
   "type": "module",
   "bin": {

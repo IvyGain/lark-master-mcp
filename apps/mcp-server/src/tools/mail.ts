@@ -5,8 +5,8 @@ import { callLarkCli, commonFlagsSchema } from './shared.js';
 
 export function registerMailTools(server: McpServer, cfg: RuntimeConfig): void {
   server.tool(
-    'lark_mail_send',
-    'Compose and send an email. By default saves as draft; pass confirm_send=true to send immediately. Wraps `lark-cli mail +send`.',
+    'lark_mail_draft',
+    'Create an email draft (NEVER sends). The user must open Lark Mail and click Send themselves. Wraps `lark-cli mail +send` without --confirm-send.',
     {
       ...commonFlagsSchema,
       to: z.array(z.string()).min(1).describe('Recipient email addresses'),
@@ -14,12 +14,8 @@ export function registerMailTools(server: McpServer, cfg: RuntimeConfig): void {
       body: z.string().describe('Plain text or HTML body'),
       cc: z.array(z.string()).optional(),
       bcc: z.array(z.string()).optional(),
-      confirm_send: z
-        .boolean()
-        .optional()
-        .describe('If true, send immediately (otherwise saved as draft)'),
     },
-    async ({ identity, dry_run, to, subject, body, cc, bcc, confirm_send }) => {
+    async ({ identity, dry_run, to, subject, body, cc, bcc }) => {
       const args = [
         'mail',
         '+send',
@@ -32,7 +28,6 @@ export function registerMailTools(server: McpServer, cfg: RuntimeConfig): void {
       ];
       if (cc && cc.length > 0) args.push('--cc', cc.join(','));
       if (bcc && bcc.length > 0) args.push('--bcc', bcc.join(','));
-      if (confirm_send) args.push('--confirm-send');
       return callLarkCli(
         { args, identity: identity ?? 'user', dryRun: dry_run },
         cfg,
@@ -79,15 +74,14 @@ export function registerMailTools(server: McpServer, cfg: RuntimeConfig): void {
   );
 
   server.tool(
-    'lark_mail_reply',
-    'Reply to an email (saved as draft by default). Wraps `lark-cli mail +reply`.',
+    'lark_mail_reply_draft',
+    'Create a reply draft (NEVER sends). The user must open Lark Mail and click Send themselves. Wraps `lark-cli mail +reply` without --confirm-send.',
     {
       ...commonFlagsSchema,
       message_id: z.string().describe('Parent message id being replied to'),
       body: z.string(),
-      confirm_send: z.boolean().optional(),
     },
-    async ({ identity, dry_run, message_id, body, confirm_send }) => {
+    async ({ identity, dry_run, message_id, body }) => {
       const args = [
         'mail',
         '+reply',
@@ -96,7 +90,6 @@ export function registerMailTools(server: McpServer, cfg: RuntimeConfig): void {
         '--body',
         body,
       ];
-      if (confirm_send) args.push('--confirm-send');
       return callLarkCli(
         { args, identity: identity ?? 'user', dryRun: dry_run },
         cfg,
