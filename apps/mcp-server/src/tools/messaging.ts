@@ -6,7 +6,7 @@ import { callLarkCli, commonFlagsSchema, jsonParam } from './shared.js';
 export function registerMessagingTools(server: McpServer, cfg: RuntimeConfig): void {
   server.tool(
     'lark_im_send_text',
-    'Send a plain text message to a Lark chat or user. Wraps `lark-cli im +messages-send`.',
+    'Send a plain text message to a Lark chat or user. By default returns a PREVIEW only — to actually send, the user must explicitly approve and you must call again with confirm_send=true. Wraps `lark-cli im +messages-send`.',
     {
       ...commonFlagsSchema,
       chat_id: z
@@ -18,8 +18,34 @@ export function registerMessagingTools(server: McpServer, cfg: RuntimeConfig): v
         .optional()
         .describe('Target user open_id (ou_xxx). Alternative to chat_id'),
       text: z.string().describe('Plain text body'),
+      confirm_send: z
+        .boolean()
+        .optional()
+        .describe(
+          'Must be true to actually send. If omitted/false, only returns a preview without sending. Always show the preview to the user and obtain explicit approval before passing true.',
+        ),
     },
-    async ({ identity, dry_run, chat_id, open_id, text }) => {
+    async ({ identity, dry_run, chat_id, open_id, text, confirm_send }) => {
+      if (!chat_id && !open_id) {
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: '❌ chat_id or open_id is required' }],
+        };
+      }
+      if (!confirm_send) {
+        const preview = {
+          preview: true,
+          would_send: {
+            target: chat_id ? { chat_id } : { open_id },
+            text,
+          },
+          next_step:
+            'Show this preview to the user verbatim. After they explicitly approve, call lark_im_send_text again with confirm_send=true.',
+        };
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(preview, null, 2) }],
+        };
+      }
       const args = ['im', '+messages-send', '--text', text];
       if (chat_id) args.push('--chat-id', chat_id);
       if (open_id) args.push('--user-id', open_id);
@@ -29,7 +55,7 @@ export function registerMessagingTools(server: McpServer, cfg: RuntimeConfig): v
 
   server.tool(
     'lark_im_send_card',
-    'Send an interactive card message. Wraps `lark-cli im messages create` with msg_type=interactive.',
+    'Send an interactive card message. By default returns a PREVIEW only — to actually send, the user must explicitly approve and you must call again with confirm_send=true. Wraps `lark-cli im messages create` with msg_type=interactive.',
     {
       ...commonFlagsSchema,
       receive_id_type: z
@@ -39,9 +65,26 @@ export function registerMessagingTools(server: McpServer, cfg: RuntimeConfig): v
       card: z
         .record(z.unknown())
         .describe('Interactive card JSON object (header/elements)'),
+      confirm_send: z
+        .boolean()
+        .optional()
+        .describe(
+          'Must be true to actually send. If omitted/false, only returns a preview without sending. Always show the preview to the user and obtain explicit approval before passing true.',
+        ),
     },
-    async ({ identity, dry_run, receive_id_type, receive_id, card }) =>
-      callLarkCli(
+    async ({ identity, dry_run, receive_id_type, receive_id, card, confirm_send }) => {
+      if (!confirm_send) {
+        const preview = {
+          preview: true,
+          would_send: { receive_id_type, receive_id, card },
+          next_step:
+            'Show this preview to the user verbatim. After they explicitly approve, call lark_im_send_card again with confirm_send=true.',
+        };
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(preview, null, 2) }],
+        };
+      }
+      return callLarkCli(
         {
           args: [
             'im',
@@ -60,7 +103,8 @@ export function registerMessagingTools(server: McpServer, cfg: RuntimeConfig): v
           dryRun: dry_run,
         },
         cfg,
-      ),
+      );
+    },
   );
 
   server.tool(
